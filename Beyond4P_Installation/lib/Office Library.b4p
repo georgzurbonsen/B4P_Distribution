@@ -1,0 +1,660 @@
+
+
+/*
+	Office Library.b4p
+	____________________________________________________________________________________________________________
+
+
+	Provides a set of functions to deal with open office file format 
+	Requires:		Zip Library.b4p (Zip functions)
+	
+
+	____________________________________________________________________________________________________________
+
+
+	Version 1.00		Runs on Beyond4P Release 5.08 and higehr
+
+	Author:			Georg zur Bonsen
+				Copyright (C) 2019 by Georg zur Bonsen, All Rights Reserved
+
+	Contents:
+
+	This library contains a set of functions to work with files in Open Office format, e.g. xlsx (note the 'x').
+	It includes extracting built-in docu properties (Word, Excel, PowerPoint and Visio) as well as loading tables
+	directly from Excel files (without need to save them in CSV format).
+
+	Limitations:
+
+	Proprietary Legacy file formats like .doc, .xls and .ppt are not supported
+
+
+	Revision History:
+	____________________________________________________________________________________________________________
+
+	Library	Beyond4P	Date		Features
+
+	1.00	5.08				First Release with basic functions
+	1.01	5.08				Correction on numbers as Excel uses scientific notation more than necessary
+	1.02	5.08		03.04.2019	Opens Excel file on active tab if sheet is not specified
+	1.02.01	5.08		06.04.2019	Bug fix (column number memory effect when loading additional tables has been resolved)
+	1.03	5.09		01.05.2019	Bug fix - Block attempts to redefine excel number format 0 (general)
+	1.04	6.01		10.09.2019	Bug fix - Had difficulties with spaces in directory and file names.
+
+*/
+
+
+once
+{
+
+
+	global() version info office include[] = "1.03";
+
+	echo(new line + "Included 'Office Library.txt' Release ", version info office include[] );
+	echo("Copyright (C) 2012..2019 Georg zur Bonsen, all rights reserved." + new line);
+
+
+	if (numeral( left( version info[], ' ')) < 6.01)
+	{
+	    echo("Version Mismatch. Prerequisite for using this file 'Office Library.txt' is Beyond4P Release 6.01 or newer.");
+	    echo("Please obtain and install latest available release.");
+	    stop;
+	}
+
+	include( Zip Library );
+
+	//
+	// Search the 7Z compression / decompression utility
+	// _________________________________________________________________________________________________________
+	//
+
+
+	global
+	{
+
+		// Create a temporary subdirectory unique to this session. This allows multiple Beyond4P
+		// sessions use their own unique subdirectories.
+
+		do()
+		{
+		    _office temp path[] = system info[temp directory] + system info[directory separator] + "B4P_Office_" + random string( 4 ) + "\";
+		}
+		while ( directory existing( _office temp path[] ) );
+
+	} 
+
+
+	table initialize( _original office number formats,
+
+		{	{ Variable Type,	Excel Format,			Beyond4P Format 	},
+			{ numeral,		"0",				"0"			},	// 1
+			{ numeral,		"0.00",				"0.00"			},	// 2
+			{ numeral,		"#,##0",			"#,##0"			},	// 3
+			{ numeral,		"#,##0.00",			"#,##0.00"		},	// 4
+
+			{ numeral,		"$#,##0_);($#,##0)",		"_($#,##0_)"		},	// 5
+			{ numeral,		"$#,##0_);[Red]($#,##0)",	"_($#,##0_)"		},	// 6
+			{ numeral,		"$#,##0_);($#,##0.00)",		"_($#,##0.00_)"		},	// 7
+			{ numeral,		"$#,##0_);[Red]($#,##0.00)",	"_($#,##0.00_)"		},	// 8
+
+			{ numeral,		"0%",				"0%"			},	// 9
+			{ numeral,		"0.00%",			"0.00%"			},	// 10
+			{ numeral,		"0.00E+00",			""			},	// 11
+			{ numeral,		"# ?/?",			""			},	// 12
+			{ numeral,		"# ??/??",			""			},	// 13
+
+			{ date,			"m/d/yyyy",			"M/D/YYYY"		},	// 14
+			{ date,			"d-mmm-yy",			"d-mmm-yy"		},	// 15
+			{ date,			"d-mmm",			"d-mmm"			},	// 16
+			{ date,			"mmm-yy",			"mmm-yy"		},	// 17
+
+			{ time,			"hh:mm AM/PM",			"hh:ii AA"		},	// 18
+			{ time,			"hh:mm:ss AM/PM",		"hh:ii:ss AA"		},	// 19
+			{ time,			"hh:mm",			"hh:ii"			},	// 20
+			{ time,			"hh:mm:ss",			"hh:ii:ss"		},	// 21
+			{ date time,		"m/d/yyyy hh:mm:ss",		"M/D/YYYY hh:ii:ss"	},	// 22
+
+			{ }, // 23
+			{ }, // 24
+			{ }, // 25
+			{ }, // 26
+			{ }, // 27
+			{ }, // 28
+			{ }, // 29
+			{ }, // 30
+			{ }, // 31
+			{ }, // 32
+			{ }, // 33
+			{ }, // 34
+			{ }, // 35
+			{ }, // 36
+
+			{ numeral,		"#,##0_);(#,##0)",		"_(#,##0_)"		},	// 37
+			{ numeral,		"#,##0_);[Red](#,##0)",		"_(#,##0_)"		},	// 38
+			{ numeral,		"#,##0_);(#,##0.00)",		"_(#,##0.00_)"		},	// 39
+			{ numeral,		"#,##0_);[Red](#,##0.00)",	"_(#,##0.00_)"		},	// 40
+
+			{ }, // 41
+			{ }, // 42
+			{ }, // 43
+			{ }, // 44
+
+			{ time,			"mm:ss",			"ii:ss"			},	// 45
+			{ time,			"[h]:mm:ss",			"h:ii:ss"		},	// 46 (B4P: Hour always shown)
+			{ time,			"mm:ss.0",			"ii:ss"			},	// 47 (B4P: 1/10 hour not supported)
+
+			{ numeral,		"##0.0E+0",			""			},	// 48 (B4P: This exponent not supported)
+			{ literal,		"@",				""			}	// 49 (Treat value as text)
+		} );
+
+	//
+	// Office files - extracting built-in document properties
+	// _________________________________________________________________________________________________________
+	//
+
+	// The MS office files like .docx, .xlsx, .pptx, etc. are in fact ZIP files containing a collection of
+	// XML files in various subdirectories plus embedded objects, for example pictures.
+	// Legacy '.doc', '.xls', etc. files do not work.
+	//
+	// The following function extracts a set of document properties from a specified MS office file.
+	//
+
+	global() office document file types[] = '*.docx,*.docm,*.pptx,*.pptm,*.xlsx,*.xlsm,*.vsdx,*.vsdm';
+
+
+	// Function:	office document properties
+	//
+	// Description:	extracts a set of document properties from a specified MS office file.
+	//
+	// Parameters:	office file name	Name of office document (must end with 4-letter file type, last one is 'x'
+	//		property names		Output: List of all property names, forced to lower case letters
+	//		property values		Output: List of all property values
+	//
+	// Return val:	-
+
+
+	define procedure( office document properties, {{ office file name, literal },
+							{ property names,  parameters, output },
+							{ property values, parameters, output }} )
+	{
+		if ( office file name[] <> office document file types[]) // Not an office file name.
+		    exception( stop, compose("1st paramter: Office File Name = '", office file name[], "' does not end with .docx,.xlsx,.pptx"), 1);
+
+		zip check file			( office file name[] );
+		zip extract files		( office file name[], "docProps\core.xml" ); // Extract docu properties from office document
+
+		// Load the XML file and extract the built-in docu properties
+		table load			( _xml table, core.xml, XML );
+		table keep selected rows	( _xml table, ([XML Level]==2) & ([XML Usage]==Start) );
+		table process			( _xml table, [XML Tag] = -right( [XML Tag], ":" ) ); // Remove prefix stuff, and lower case.
+		table process selected rows	( _xml table, ([XML Contents]='????-??-??T??:??:???'), 
+		    				[XML Contents] = [XML Contents]{0..9} + " " + [XML Contents]{11..18} ); // Clean up date and time values
+
+		// Capture built-in document property info
+		property names[]  		= [_xml table:XML Tag,..];
+		property values[] 		= [_xml table:XML Contents,..];
+
+		// Clean up
+		table delete 			(_xml table );
+		file delete silently		( core.xml );
+
+	}
+
+
+
+	// Function:	advanced directory listing, and ... recursive
+	//
+	// Description:	Generates a directory listing including office properties
+	//
+	// Parameters:	table name		Destination table
+	//		opt. path name		Directory path to list
+	//		opt. match name		Matching specification (Default: *.*)
+	//		opt. listing option	files, directories, files and directories, all
+	//
+	// Return val:	-
+
+
+	define procedure and function( advanced directory listing, {{ table name, literal }, { path name, literal }, {match name, literal }, { listing option, literal}}, 1, 4 )
+	{
+		temp verbose[] = runtime settings[ verbose ]; 
+		runtime settings[ verbose ] = quiet;
+
+		if (parameter count[] < 2) path name[] = "./";
+		if (parameter count[] < 3) match name[] = "*.*";
+
+		if (parameter count[] ==4)
+		{
+		    if (listing options[]<>files,directories,files and directories,all)
+		        exception( stop, compose("4th paramter: listing option '", listing option[], "' is invalid"), 1);
+		}
+		else: listing option[] = "files and directories";
+
+		count[] = directory listing( table name[], path name[], match name[], listing option[] );
+		if (count[]<=0) return (count[]);
+	
+		table process selected rows( table name[], ([Name]=office document file types[]),
+		{
+			path[] = [Path];
+			if (path[] = "") path[] = ".";
+			if (path[]{-1}!='\') path[] += '\';
+			path[] += [Name];
+			office document properties( path[], property names[], property values[] );
+			table insert missing columns( table name[], property names[]);
+			[property names[]] = property values[];
+		} );
+		runtime settings[ verbose ] = temp verbose[];
+		return(count[]);
+	}
+
+
+	define procedure and function ( advanced directory listing recursive, {{ table name, literal }, { path name, literal }, {match name, literal }, { listing option, literal}}, 1, 4 )
+	{
+		temp verbose[] = runtime settings[ verbose ]; 
+		runtime settings[ verbose ] = quiet;
+
+		if (parameter count[] < 2) path name[] = "./";
+		if (parameter count[] < 3) match name[] = "*.*";
+
+
+		if (parameter count[] ==4)
+		{
+		    if (listing options[]<>files,directories,files and directories,all)
+		        exception( stop, compose("4th paramter: listing option '", listing option[], "' is invalid"), 1);
+		}
+		else: listing option[] = "files and directories";
+
+		count[] = directory listing recursive( table name[], path name[], match name[], listing option[] );
+
+		if (count[]<=0) return (count[]);
+	
+		table process selected rows( table name[], ([Name]=office document file types[]),
+		{
+			path[] 				= [Path];
+			if (path[] = "") 		path[] = ".";
+			if (path[]{-1}!='\') 		path[] += '\';
+			path[] 				+= [Name];
+			office document properties	( path[], property names[], property values[] );
+			table insert missing columns	( table name[], property names[]);
+			[property names[]] 		= property values[];
+		} );
+		runtime settings[ verbose ] = temp verbose[];
+		return(count[]);
+	}
+
+
+	//
+	// Load data from Excel files directly (file type .xlsx, .xlsm)
+	// _________________________________________________________________________________________________________
+
+
+	// Function:	excel sheets
+	//
+	// Description:	Identifies the Excel sheets inside the Excel file
+	//
+	// Parameters:	excel file name		Name of Exel file (e.g. .xlsx, .xslm)
+	//
+	// Return val:	parameter set		Contains list of available sheets
+
+
+	define function( excel list sheets, {{ excel file name, literal }} )
+	{
+		forget memorized table columns;
+
+		// Step 1: Verify the file name, make local copy in temporary directory.
+
+		if ( excel file name[]<>'*.xlsx','*.xlsm' )
+		    exception( stop, compose("2nd paramter: Excel File Name = '", office file name[], "' does not end with .xlsx or .xlsm."), 1);
+
+		if (!file existing( excel file name[] ))
+		    exception( stop, compose("2nd paramter: Excel File Name = '", office file name[], "' not found."), 1);
+
+
+		// Step 2: Create a local directory
+
+		directory delete recursive all	( _office temp path[] );
+		directory create		( _office temp path[] ); 
+
+
+		// Step 3: Extract the sheet lists
+
+		zip extract files		( excel file name[], "xl/workbook.xml", _office temp path[] );
+
+		if (!file existing( _office temp path[] + "workbook.xml" ))
+		    exception( stop, compose("1st paramter: Excel file is empty, corrupted or wrong format"), 1);
+
+		table load			( _workbook, _office temp path[] + "workbook.xml", XML );
+		table keep selected rows	( _workbook, [XML Tag]=sheet);
+		ret val[] 			= [_workbook: name, ..];
+
+
+		// Step 4: Clean up
+
+		table delete			( _workbook );
+		directory delete recursive all	( _office temp path[] );
+
+		return (ret val[] );
+	}
+
+
+
+
+	// Function:	table load excel file
+	//
+	// Description:	Loads tables from a specified excel file
+	//
+	// Parameters:	table name		Destination table
+	//		excel file name		Name of Exel file (e.g. .xlsx, .xslm)
+	//		opt. excel sheet name	Excel sheet name or number (optional)
+	//
+	// Return val:	-
+
+
+
+	define procedure( table load excel file, { { table name, literal }, { excel file name, literal }, { excel sheet name, numeral or literal }}, 2, 3 )
+	{
+		forget memorized table columns;
+
+		saved table conversion numeral[] = table conversion[numeral];
+		sheet number[]			 = 1;	// Default
+
+		// Step 1: Verify the file name, make local copy in temporary directory.
+
+		echo("Load Excel file '", excel file name[], "'.");
+
+		if (runtime settings[verbose]<>quiet) echo("    Step 1:    Preparing ...");
+
+		if ( excel file name[]<>'*.xlsx','*.xlsm' )
+		    exception( stop, compose("2nd paramter: Excel File Name = '", excel file name[], "' does not end with .xlsx or .xlsm."), 1);
+
+		if (!file existing( excel file name[] ))
+		    exception( stop, compose("2nd paramter: Excel File Name = '", excel file name[], "' not found."), 1);
+
+		directory delete recursive all	( _office temp path[] );
+		directory create		( _office temp path[] ); 
+		
+		temp excel file name[] 		= _office temp path[] + right last match( excel file name[], "\" );
+// Alternative	file copy 			( excel file name[], temp excel file name[] );
+
+
+
+
+		// Step 2: Do a first extract of workbook, sharedstrings and styles
+		if (runtime settings[verbose]<>quiet) echo("    Step 2:    Extract list of sheets, shared strings and styles ...");
+
+		zip extract files		(      excel file name[], {"xl/workbook.xml","xl/sharedStrings.xml","xl/styles.xml"}, _office temp path[] );
+// Alternative	zip extract files		( temp excel file name[], {"xl/workbook.xml","xl/sharedStrings.xml","xl/styles.xml"}, _office temp path[] );
+
+
+
+
+		// Step 3: Identify available sheets 
+		if (runtime settings[verbose]<>quiet) echo("    Step 3:    Identify available Excel sheets ...");
+
+
+		if (!file existing( _office temp path[] + "workbook.xml" ))
+		    exception( stop, compose("2nd paramter: Excel file is empty, corrupted or wrong format"), 1);
+
+		table load			( _office workbook, _office temp path[] + "workbook.xml", XML );
+
+		if (parameter count[] = 2)
+		{
+			if (table column number( _office workbook, activeTab ) >= 0)
+			{
+				sheet number[] = ([_office workbook: activeTab, ..]/{""}){0} + 1;
+				echo("    Identified sheet number ", sheet number[] );
+			}
+		}		
+
+
+		table keep selected rows	( _office workbook, [XML Tag]=sheet);
+		table keep columns		( _office workbook, {name, sheetId} );
+		sheet count[] 			= table length( _office workbook ) - 1;
+
+		if (parameter count[]>=3)
+		{
+			if (type ( excel sheet name[] ) = numeral) 
+			{
+			    if ( (excel sheet name[] < 1) | (excel sheet name[] > sheet count[]) )
+			    {
+				exception( stop, compose("3rd parameter: Excel Sheet name = ", excel sheet name[], " as numeral outside range 0..", sheet count[], "."), 1 );
+			    }
+			}
+			else // Literal
+			{
+			    sheet number [] = find( [_office workbook:name,..], excel sheet name[] );
+			    if (sheet number[]<0)
+			    {
+				exception( stop, compose("3rd parameter: Excel Sheet name = '", excel sheet name[], "' not found.", new line,
+						"Excel file contains following sheets: ", [_office workbook:name,..]), 1 );
+			    }
+			    sheet number[] += 1; // First sheet has number 1
+			}
+		}
+		table delete ( _office workbook );
+
+
+
+
+		// Step 4: Load shared strings file (if available)
+		if (runtime settings[verbose]<>quiet) echo("    Step 4:    Load shared strings ...");
+
+
+		shared strings xml file name[] = "sharedStrings.xml";
+
+		shared strings available[] = false;
+		if (file existing(_office temp path[] + shared strings xml file name[]))
+		{
+			shared strings available[] = true;
+			table conversion[numeral]  = false; // In this procedure, treat all values as literals.
+			table load			( _office shared strings, _office temp path[] + shared strings xml file name[], XML );
+
+			table keep selected rows	( _office shared strings, ([XML Tag]=si,t) & ([XML Usage]=Start,Empty) );
+
+			// Special case with Excel files:
+			//
+			// Scan through the table with 2 or more adjacent XML TaG = t where string fragments need to be merged together.
+			// This is the case when formatting or fonts change inside the string.
+			//
+
+			count[] = 0;
+			dest row nr[] = 0;
+			for all table rows ( _office shared strings, XML Tag, tag[], row nr[] )
+			{
+				if (tag[]=si)
+				{
+				    count[] = 0;
+				}
+				else // tag = t
+				{
+					if (count[]++==0)
+					{
+						dest row nr[] = row nr[];
+					}
+					else
+					{
+						[XML Contents,dest row nr[]] += [XML Contents]; // Combine the strings
+						[XML Tag] = Ignore; 				// And ignore the row below.
+					}
+				}
+			}
+
+			table keep selected rows	( _office shared strings, [XML Tag]=t);
+			table keep columns		( _office shared strings, XML Contents );
+			table process			( _office shared strings, [XML Contents] /= "_x000D_" ); // Remove unnecessary "Carriage Return" comments.
+// Debug		table save			( _office shared strings, _office temp path[] + shared strings xml file name[] - ".xml" + ".csv" ); 
+
+		}
+		table conversion[numeral]  = true;
+
+
+
+		// Step 5: Load styles sheet (if available)
+		if (runtime settings[verbose]<>quiet) echo("    Step 5:    Load styles sheet ...");
+
+
+		styles xml file name[] = "styles.xml";
+
+		styles available[] = false;
+		if (file existing(_office temp path[] + styles xml file name[]))
+		{
+			styles available[] = true;
+			table load			( _office styles, _office temp path[] + styles xml file name[], XML );
+// Debug 		table save ( _office styles, "orig office styles.csv" ); 
+
+		// Step 4A: Put additional styles sheets into the '_office number formats' table
+
+			table copy table ( _original office number formats, _office number formats );
+			table process selected rows	( _office styles, [XML Tag]==numFmt,
+				{
+					numfmt[] 	= [(formatCode)]; // Do not remove parentheses.  It forces to look up for actual column location and not
+					numfmtid[]	= [(numFmtId)];   // use memorized column number in the previous call
+
+					if (numfmtid[] = 0) continue; // Do not overwrite or redefine numfmtID = 0 (general)
+
+					[_office number formats:Excel    Format,numfmtid[]] = numfmt[];
+					[_office number formats:Beyond4P Format,numfmtid[]] = numfmt[];
+
+					// Remove quoted text and country specific info, keep plain formatting symbols 
+					while (find(numfmt[], '"')>=0) numfmt[] = outside exclude( numfmt[], '"', '"' );
+					while (find(numfmt[], '[')>=0) numfmt[] = outside exclude( numfmt[], '[', ']' );
+
+					date inside[] = (find(numfmt[], 'y')>=0) | (find(numfmt[], 'd')>=0);
+					time inside[] = (find(numfmt[], 'h')>=0) | (find(numfmt[], 's')>=0);
+					num  inside[] = (find(numfmt[], '#')>=0) | (find(numfmt[], '0')>=0) | (find(numfmt[], '?')>=0);
+
+					if (date inside[] & time inside[]) 
+					{
+						[_office number formats:Variable Type,numfmtid[]] = date time;
+					}
+					else: if (date inside[])
+					{
+						[_office number formats:Variable Type,numfmtid[]] = date;
+					}
+					else: if (time inside[])
+					{
+						[_office number formats:Variable Type,numfmtid[]] = time;
+					}
+					else 
+					{
+						[_office number formats:Variable Type,numfmtid[]] = numeral;
+					}
+					
+
+				} );
+
+			table delete rows( _office styles, 1, [_office styles:XML Tag,cellXfs] ); // Delete Num format def'n
+			table keep selected rows( _office styles, [(numFmtId)] <> "");
+
+// Debug		table save ( _office number formats, _office temp path[] + "office number formats.csv" ); 
+// Debug		table save ( _office styles, _office temp path[] + styles xml file name[] - ".xml" + ".csv" ); 
+
+		}
+
+
+		// Step 6: Load selected sheet
+		if (runtime settings[verbose]<>quiet) echo("    Step 6:    Load selected Excel sheet number '", sheet number[],"' ...");
+
+
+		sheet xml file name[] 	= "sheet" + literal(sheet number[]) + ".xml";
+		sheet xml path name[] 	= "xl/worksheets/" + sheet xml file name[];
+
+		zip extract files		(      excel file name[], sheet xml path name[], _office temp path[] );
+// Alternative	zip extract files		( temp excel file name[], sheet xml path name[], _office temp path[] );
+
+
+		if (!file existing( _office temp path[] + sheet xml file name[] ))
+		    exception( stop, compose("2nd paramter: Can't find the sheet in the Excel file."), 1);
+
+		table load 			( _office sheet, _office temp path[] + sheet xml file name[], XML, {r,t,s} );
+
+
+
+
+		// Step 7: Load selected sheet
+		if (runtime settings[verbose]<>quiet) echo("    Step 7:    File loaded.  Remove unnecessary contents ...");
+
+
+		table keep selected rows	( _office sheet, ([XML Usage]==Start) & ([XML Tag]=row,c,v)  );
+
+		table insert missing columns	( _office sheet, {r,t,s} );
+		table keep columns		( _office sheet, {XML Tag,XML Contents,r,t,s } );
+	
+
+		// Step 8: Load selected sheet
+		if (runtime settings[verbose]<>quiet) echo("    Step 8:    Work through the sheet and create the final table ...");
+
+		table create( table name[] );
+
+		numfmtid col nr[] = table column number( _office styles, numFmtId );
+		table process ( _office sheet,
+		{
+			if ([XML Tag]==row) { row nr[] = [r]-1; continue loop; }
+			if ([XML Tag]==c)   { col nr[] = excel column number([r])-1; data type[] = [t]; style ref[] = [s]; continue loop; }
+			
+			// Left over tag is 'v' for value
+
+			switch( data type[] )
+			{
+			    case( "" ) // Still to worry about number formats
+				{
+					variable type[] = numeral;
+					number format id[] = 0;
+					if (style ref[]<>"") // Style reference provided
+					{
+// Debug 					echo(new line, ":::: Style Ref: ", style ref[] );
+						number format id[] = [_office styles:numfmtid col nr[],style ref[]+1];
+// Debug 					echo(":::: Num Fmt  : ", number format id[] );
+					}
+					if (number format id[]>0)
+					{
+						variable type[] = [_office number formats:Variable Type,number format id[]];
+// Debug 					echo("::: Var Type  : ", variable type[]);
+					}
+					switch( variable type[])
+					{
+						case('date') 	  [table name[]:col nr[],row nr[]] = literal(pure date( numeral([XML Contents]) ),"YYYY-MM-DD");
+						case('time') 	  [table name[]:col nr[],row nr[]] = literal(pure time( numeral([XML Contents]) ),"HH:II:SS");
+						case('date time') [table name[]:col nr[],row nr[]] = literal(date time( numeral([XML Contents]) ),"YYYY-MM-DD HH:II:SS");
+						else:		  [table name[]:col nr[],row nr[]] = numeral([XML Contents]);
+					}
+				}
+			    case( "str" ) // Local strings, not shared
+				{
+					[table name[]:col nr[],row nr[]] = literal([XML Contents]) / "_x000D_"; // Eliminate commented carriage return symbols
+				}
+			    case( "s" ) // Shared strings
+				{
+					[table name[]:col nr[],row nr[]] = [_office shared strings:0,[XML Contents]+1];	
+				}
+			    case( "b" ) // Boolean
+				{
+					[table name[]:col nr[],row nr[]] = boolean( [XML Contents] );
+				}
+			    case( "e" ) // Error
+				{
+					[table name[]:col nr[],row nr[]] = [XML Contents];
+				}
+
+			}
+		} );
+
+// Debug	table save ( _office sheet, _office temp path[] + sheet xml file name[] - ".xml" + ".csv" ); 
+
+
+
+		// Step 9: Clean up
+		if (runtime settings[verbose]<>quiet) echo("    Step 9:    Cleaning up ...");
+
+		directory delete recursive all		( _office temp path[] );
+		table delete silently			(_office shared strings, _office styles, _office sheet);
+		table conversion[numeral] 		= saved table conversion numeral[];
+
+
+		echo("Done. Table contains ", table length( table name[] )," rows and up to ", table max width( table name[]), " columns.", new line );
+	}
+
+}
+
+
+
+
+
