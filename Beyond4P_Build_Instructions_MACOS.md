@@ -33,8 +33,8 @@ __XCODE Application__
 
 __Beyond4P_Distribution folder__:
 1. unzip Beyond4P_Installation_LINUX_64bit -> Beyond4P_Intallation
-2. move 'b4p-macos' binary to Beyond4P_Installation
-3. copy '/Users/rafael/cpp/Beyond4P License File.json' to Beyond4P_Installation
+2. move 'b4p-macos' binary to Beyond4P_Installation folder
+3. copy '/Users/rafael/cpp/Beyond4P License File.json' to Beyond4P_Installation folder
 
 
 __Beyond4P_Installation folder__:
