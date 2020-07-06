@@ -40,6 +40,7 @@ __Beyond4P_Distribution folder__:
 __Beyond4P_Installation folder__:
 1. delete Beyond4P binary
 2. rename 'b4p-macos' to 'Beyond4P'
+3. change permissions all all files and folders in Installation folder to 755
 
 
 __Installation__
