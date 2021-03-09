@@ -10,6 +10,31 @@
 // 1.03		12.11.2020	Included the My B4P Init.b4p file
 // 1.04		21.02.2021	Include style theme sheet installation
 
+
+define procedure and function( get long options, {{ valid option names, to parameters members to literal}}, 0, 1 )
+{
+    if (existing( long options[] )) if (identify( long options[] )=='array') delete members( long options[] ); // Delete members if array
+    local
+    {
+	count[]= 0;
+	arg[]= '';
+    }	   
+    for all variables( command line arguments[], arg[] )
+    {
+	if (arg[] = '--*')
+	{
+	    arg[] -= '--';
+	    if (parameter count[] >= 1) if ( find( valid option names[], left( arg[], "=") ) < 0 )
+	    {
+	        exception( stop, compose("Function 'get long options': long option '--", arg[], "' in the command line is not valid."), -1);
+	    }
+	    count[]++;
+	    global() long options[left( arg[], '=' )] = select if( (arg[] = '*=*'), best type(right( arg[], "=" )), null() );
+	}
+    }
+    return( count[] );
+}
+
 {
 	echo(new line, "B4P installation program is starting (Linux and MacOS platforms) ... ");
 
@@ -31,11 +56,63 @@
 
 	table initialize( menu,
 	{ 	{ Choices,	Explanations, 						Selections 	},
-		{ M,		'Do Machine installation for all users',       	M 		},
+		{ M,		'Do Machine installation for all users',    	   	M 		},
 		{ D,		'De-install B4P', 					D 		},
 		{ I,		'Do Identification for acquiring a license',		I 		},
 		{ E,		'Exit installer without actions',			E 		}  
 	} );
+
+	get long options( { help, choice, 'keep-user-settings', 'keep-my-init', 'keep-my-themes', license, locale, 'create-personal-folder' } );
+
+
+
+
+	//
+	// Assistance
+	//
+
+	if (existing( long options[help] ))
+	{
+	    echo("Syntax: setup");
+	    echo("        setup [long options]");
+	    echo;
+	    echo("        All long options begin with two consecutive minus signs.");
+	    echo("        The options may be arranged in any order.  Where applicable,");
+	    echo("        add option value after '=' without spaces around them.");
+	    echo("        Option values like file names may be put into quotation marks.");
+	    echo;
+	    echo("        --help                   Shows this help. No installation started");
+	    echo;
+	    echo("        --choice=machine         Do machine installation for all users");
+	    echo("                 deinstall       Do de-installation");
+	    echo("                 info            Provide info for license generation");
+	    echo("                 exit            No actions.");
+	    echo("        Note: Using '--choice' will run installation in batch mode entirely");
+	    echo("        Note: Must also provide locale info at the first installation");
+	    echo;
+	    echo("        --keep-user-settings     Keep user settings from previous installation");
+	    echo("        --keep-my-init           Keep own 'My B4P Init.b4p' file");
+	    echo("        --keep-my-themes         Keep own 'B4P Style Themes.xlsx' file");
+	    echo("        --create-personal-folder Create personal folder for B4P programs");
+	    echo;
+	    echo("        --license=keep           Keep license from previous installation");
+	    echo("                 =new            Use new license provided in install. directory");
+	    echo("                 =no             Apply no license. B4P runs in demo mode");
+	    echo("                 ="Filename.json" Specify path and name of license file to use");
+	    echo;
+	    echo("        --locale=keep            Keep existing locale settings");
+	    echo("                 xx_YY           Language/Country designation, e.g. 'en_US'");
+	    echo("          Specified locales are not case sensitive, hypen or underscore OK");
+	    echo("          Use locale info as use with Excel to match number and date formats");
+	    echo("          as well as list separators (commas or semicoons).");
+	    echo;
+	    echo;
+	    echo("Example:   setup --choice=machine --locale=en_US");
+	    echo;
+	    echo("Note:   Elevated user privileges are requierd (add 'sudo' before command)");
+	    echo;
+	    exit;
+	}
 
 
 
@@ -46,31 +123,61 @@
 	echo(new line, "1 >> Check the B4P privileges to run installation program ...", new line);
 
 	if (system info[privileges] <> elevated,administrator) 
-		throw( "Insufficient privileges." + new line + "    Use 'sudo ./setup.b4p' to install B4P on your system." );
+		throw( "Insufficient privileges." + new line + "    Type 'sudo ./setup' to install B4P on your system." );
+
+
 
 	//
-	// Identify installation target (Menu)
+	// Installation Option, either using main menu or batch
 	//
 
 	echo(new line, "2 >> Installation program - Main Menu ...", new line);
 
-	choice[] = table menu quick( menu, Choices, Explanations, Selections );
+	if (existing and valid(long options[choice]))
+	{
+	    batch[] = true;
+	    runtime settings[exit directly] = true;
+	    available choices[] = { machine, user, deinstall, info, exit }; // Note: 'user' choice applies for windows only.
+	    if ( find( available choices[], long options[choice]) < 0 )
+	    {
+		throw( compose( "Encountered invalid value assigned to long option '--choice': ", long options[choice], new line, "    Valid choices are: ", join(available choices[],", "), "." ) );
+	    }
+	    echo("    Recognized command line long option: --choice=", long options[choice] );
+	    choice[] = +long options[choice]{0}; // M for machine, U for user and D for de-install (1st character moved to upper case
+	}
+	else
+	{
+	    batch[] = false;
+	    choice[] = table menu quick( menu, Choices, Explanations, Selections );
+	}
 
 	if (choice[] = E) exit;
 
-	if (choice[] = D)
+	if ( (choice[] = D) & !batch[] )
 	{
-	    reply[] = input quick ignore case(new line + "A t t e n t i o n" + new line + "Are you sure you want to uninstall B4P? ", NY );
-	    if (reply[]<>Y) exit;
+	    reply[] = input quick ignore case(new line + "    A t t e n t i o n" + new line + "    Are you sure you want to de-install B4P? ", NY );
+	    if (reply[]<>Y)
+	    {
+		if (batch[]) abort;
+		exit;
+	    }
 	}
-
 
 	if (choice[] = I)
 	{
 		echo		(new line, "    Getting system identfication for license generation ..." );
 		id[] 		= license provide identification();
-		echo		(new line, "    Specify a personal name and/or company name as license holder name");
-		holder[] 	= input(   "    Enter the name: ", literal );
+
+
+		if (batch[])
+		{
+		    holder[] = system info[user name];
+		}
+		else
+		{
+		    echo	(new line, "    Specify a personal name and/or company name as license holder name");
+		    holder[] 	= input(   "    Enter the name: ", literal );
+		}
 		
 		attribute write( ".", identification file[], Holder, holder[] );
 		attribute write( ".", identification file[], Identification, id[] );
@@ -79,8 +186,10 @@
 		echo		(new line, "    The identification info is stored in this file: ", identification file[] );
 		echo		("    --> Please send this .JSON file out by mail in order to receive the license key.");
 		echo( new line, "Done", new line, new line );
+
+		sleep(3);
+		if (batch[]) abort;
 		exit;
-	
 	}
 
 
@@ -88,19 +197,19 @@
 	// Check if all files needed for installation are available
 	//
 
-	echo(new line, "3 >> Check that all required files are available for installation ...", new line );
 
 	if (choice[] <> D)
 	{
+		echo(new line, "3 >> Check that all required files are available for installation ...", new line );
 
-		required files 2[Program]		= "b4p";
-		required files 2[Manual]		= "B4P Reference Manual.b4p";
-		required files 2[Install Script]	= "setup";
-	
-		required files 1[Locales List]	= "List of Locales.csv";
+		required files 2 [Program]		= "b4p";
+		required files 2 [Manual]		= "B4P Reference Manual.b4p";
+		required files 2 [Install Script]	= "setup";
+		required files 1 [Locales List]		= "List of Locales.csv";
+		required files 1 [Style Themes]		= "B4P Style Themes.xlsx";
+
 		required direct 1[lib]			= "lib";
 		required direct 1[weblib]		= "weblib";
-
 
 		for all variables( required direct 1[], direct[] )	// To copy to /usr/local/etc
 		{
@@ -119,7 +228,7 @@
 		    if (!file existing ( dir[installation image] + file[])) throw( "Following required file is missing: " + file[] );
 		}
 	}
-	else : echo("Skipped.");
+
 
 
 	//
@@ -142,9 +251,10 @@
 	// Check for existing user, locale and license settings.
 	//
 
+	echo(new line, "5 >> Check for exisintg user, local, license and themes setting ...", new line);
+
 	if (choice[] <> D) // All choices except uninstallation
 	{
-
 	    user settings file name[]   	= dir[user application data] + slash[] + user settings file[];
 	    user settings existing[] 		= file existing( user settings file name[]   );
 
@@ -152,7 +262,7 @@
 	    b4p style themes file existing[]	= file existing( b4p style themes file name[] );
 
 	    my b4p init file name[]		= system info[user app data directory b4p] + slash[] + "My B4P Init.b4p";
-	    my b4p init file existing[]		= file existing( my b4p init file name[] );
+	    my b4p init file existing[]	= file existing( my b4p init file name[] );
 
 
 	    locale settings file name[] 	= dir[user application data] + slash[] + locale settings file[];
@@ -172,13 +282,25 @@
 
 	    if (user settings existing[])
 	    {
-		echo(new line, "    The user settings file contains starting directory name.");
+		echo(new line, "    The existing user settings file contains starting directory name,");
 		echo(          "    user defined prompt, and other user specific data.", new line);
-		reply[]	= input quick ignore case("    Do you want to keep the user settings from the previous installation ?", "NY");
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-user-settings'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the user settings file from the previous installation ?", NY);
+		}
 		if (reply[]=N) 
 		{
+		    echo("    Using new user settings.");
 		    file delete( user settings file name[] );
 		    user settings existing[] = false;
+		}
+		else
+		{
+		    echo("    Keeping existing user settings.");
 		}
 	    }
 
@@ -187,69 +309,130 @@
 	    {
 		echo(new line, "    The locale settings file contains language and country specific" );
 		echo(          "    number and date formats.", new line);
-		reply[] = input quick ignore case("    Do you want to keep the locale settings from the previous installation ?", "NY");
+
+		reply[] = pick if existing and valid(long options[locale], '' );
+		if (batch[])
+		{
+		    if (reply[]='') reply[] = keep;
+		}
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep these locale settings  ?", "NY");
+		}
+		else
+		{
+		    if (reply[]=keep) // --locale=keep
+		    {
+			reply[] = Y;		
+		    }
+		    else
+		    {
+			reply[] = N;
+		    }
+		}
+
 		if (reply[]=N) 
 		{
+		    echo("    Using new locale settings.");
 		    file delete( locale settings file name[] );
 		    locale settings existing[] = false;
 		}
 	    }
 
+
 	    if (my b4p init file existing[])
 	    {
-		echo(new line, "    The file 'My B4P Init File.b4p' contains your personalized B4P initialization program.");
-		reply[] = input quick ignore case("    Do you want to keep the this file (if no: A new plain file will be provided) ?", "NY");
+		echo(new line, "    The file 'My B4P Init File.b4p' contains your personalized B4P,");
+		echo(          "    initialization program.", new line);
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-my-init'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the this file from the previous installation ?", NY);
+		}
 		if (reply[]=N) 
 		{
+		    echo("    Using new 'My B4P Init File.b4p'.");
 		    file delete( my b4p init file name[] );
 		    my b4p init file existing[] = false;
 		}
-	    }
-
-	    if (b4p style themes file existing[])
-	    {
-		echo(new line, "    The file 'B4P Style Themes.xlsx' contains the style themes", new line, "    (which you may have extended on your behalf)");
-		reply[] = input quick ignore case("    Do you want to keep the this file (if no: A new theme file will be provided) ?", "NY");
-		if (reply[]=N) 
+		else
 		{
-		    file delete( b4p style themes file name[] );
-		    b4p style themes file name[] = false;
+		    echo("    Keeping existing 'My B4P Init File.b4p' for the new installation.");
 		}
 	    }
 
 
-	    if (directory existing( dir[user application data] ))
+	    if (b4p style themes file existing[])
 	    {
-		file copy multiple overwrite all(  dir[user application data], ".", "*.json" );  // Copy all settings file to local installation directory
-		file copy multiple overwrite all(  dir[user application data], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
-		file copy multiple overwrite all(  dir[user application data], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
+		echo(new line, "    The file 'My Style Themes.xlsx' (Excel file) contains all themes which,");
+		echo(          "    can be used with the function 'table style themes(...)' to format tables.", new line);
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-my-themes'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep this file (No: A new theme file will be introduced) ?", "NY");
+		}
+		if (reply[]=N) 
+		{
+		    echo("    Using new style themes.");
+		    file delete( b4p style themes file name[] );
+		    b4p style themes file name[] = false;
+		}
+		else
+		{
+		    echo("    Keeping existing themes file for the new installation.");
+		}
 	    }
+
+
+	    if (directory existing( user settings directory[] ))
+	    {
+		file copy multiple overwrite all(  user settings directory[], ".", "*.json" );  // Copy all settings file to local installation directory
+		file copy multiple overwrite all(  user settings directory[], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
+		file copy multiple overwrite all(  user settings directory[], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
+	    }
+
 
 	    if (license file existing[])
 	    {
 		attribute read( left last match( license file name[], slash[] ), license file[], Holder, license[Holder] );
 		attribute read( left last match( license file name[], slash[] ), license file[], Key, license[Key] );
-		echo(new line, "    The license file contains the authentication info to run B4P");
-		echo(          "    with given license rights.  With few exceptions, the license file");
-		echo(          "    continues to be valid for the next release.");
-		echo(          "    License holder: ", license[Holder] );
-		reply[] = input quick ignore case("    Do you want to keep the license file from the previous installation ?", "NY");
+
+		echo(new line, "    The license file contains the authentication info to run B4P with given license rights.");
+		echo(          "    With few exceptions, the license file continues to be valid for the next release.", new line);
+		echo(          "    License holder: ", license[Holder], new line );
+
+		reply[] = pick if existing and valid(long options['license'], '' );
+		if (reply[] == keep)		reply[] = Y;
+		else: if (reply[] !='')		reply[] = N; // Anything else but keep
+		if (batch[] & reply[] = '')	reply[] = N;
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the license file from the previous installation ?", "NY");
+		}
 		if (reply[]=N) 
 		{
+		    echo("    Old license file will not be kept.");
 		    license file existing[] = false;
 		    delete(license[Key], license[Holder]);
 		}
 		else
 		{
-		    file copy multiple overwrite all( dir[license], ".", license file[] ); // Keep license file as new location may be different
+		    echo("    Old license file will be kept.");
+		    file copy multiple overwrite all( license directory[], ".", license file[] ); // Keep license file as new location may be different
 		}
 	    }
-
 	}
 
 
 	{
-	    echo(new line, "5 >> Deleting B4P program and application data subdirectories (if existing) ...", new line);
+	    echo(new line, "6 >> Deleting B4P program and application data subdirectories (if existing) ...", new line);
 
 	    for all parameters( { dir[program files b4p], dir[user application data] }, dir[] )
 	    {
@@ -274,6 +457,10 @@
 	if (choice[] = D)
 	{
 		echo(new line, "De-installation completed.", new line);
+	if (choice[] = D)
+	{
+		echo(new line, "De-Installation completed.", new line);
+		if (batch[]) abort;
 		exit;
 	}
 
@@ -281,7 +468,7 @@
 	// Create the new folder incl. libraries folder
 	//
 
-	echo(new line, "6 >> Create new folders for B4P program ...", new line);
+	echo(new line, "7 >> Create new folders for B4P program ...", new line);
 
 
 	// create /etc/b4p and /etc/b4p/lib
@@ -305,10 +492,10 @@
 
 
 	//
-	// Copy the contents (Program, DLL file, libraries, etc.) 
+	// Copy the contents (Program, libraries, etc.) 
 	//
 
-	echo(new line, "7 >> Copy all files to destination directory '", dir[program files b4p] , " ...", new line);
+	echo(new line, "8 >> Copy all files to destination directory '", dir[program files b4p] , " ...", new line);
 
 	for all variables( required files 1[], file[] )
 	{
@@ -335,7 +522,7 @@
 	// Restore user settings and locale settings
 	//
 
-	echo(new line, "8 >> Restore user and locale settings (if available) ..." , new line);
+	echo(new line, "9 >> Restore user settings (where available) ..." , new line);
 
 	if ( file existing( user settings file[] )  )
 	{
@@ -349,43 +536,68 @@
 	    echo("    Info: User settings file not found. Skipped copying", new line);
 	}
 
+
 	file copy multiple overwrite all(  ".", dir[user application data], "My B4P Init.b4p" ); 
-	file copy multiple overwrite all(  ".", dir[user application data], "My B4P Init.b4p" ); 
+	file copy multiple overwrite all(  ".", dir[user application data], "B4P Style Themes.xlsx" ); 
 
-	if ( file existing( locale settings file[] )  )
+
+
+
+	echo(new line, "10 >> Define locale settings ..." , new line);
+
+	table load( loc, "List of Locales.csv" );
+	table keep columns( loc, {Locale, Language, Country } );
+	table delete blank rows( loc );
+	table insert columns( loc, Choice, "", 0);
+
+	locale provided as option[] = select if existing and valid( long options[locale], '' );
+
+	if (locale provided as option[] <> '',keep)
 	{
-	    echo("    Found: ", locale settings file[] );
-
-	    file copy multiple overwrite all(  ".", dir[user application data], locale settings file[] ); 
-	    file delete ( locale settings file[] );
-	}
-	else
-	{
-
-	    echo("    Info: No locale settings have been defined yet.");
-	    table load( loc, "List of Locales.csv" );
-	    table keep columns( loc, {Locale, Language, Country } );
-	    table delete blank rows( loc );
-	    table insert columns( loc, Choice, "", 0);
-
-	    table copy table( loc, loc1 );
-	    table consolidate( loc1, Language );
-	    table process( loc1, [Choice] = chr( row()+64 ) );
-	    echo(new line,"    Step 1 - Choose language:");
-	    lang[] = table menu quick( loc1, Choice, Language, Language );
-
-	    table copy table( loc, loc1 );
-	    table keep selected rows( loc1, [Language]=lang[] );
-	    table process( loc1, [Choice] = chr( row()+64 ) );
-	    echo(new line,"    Step 2 - Choose country:");
-		    locale[] = table menu quick( loc1, Choice, Country, Locale );
-
-	    echo("    Locale chosen: ", locale[] );	    
-	    table delete ( loc, loc1 );
-
+	    substitute all( locale provided as option[], '-', '_' ); // Use underscore
+	    locale[] = '';
+	    table process selected rows( loc, (locale provided as option[] =+ [Locale]), locale[] = [Locale] );
+	    if (locale[] == '') throw( "Locale info '" + long options[locale] + "' provided with '--locale' is not supported.");
+	    echo("    Locale chosen: ", locale[], " / ", [loc:Locale,locale[],Language]," in ",[loc:Locale,locale[],Country],"." );
 	    set locale( locale[], "List of Locales.csv" );
 	    echo("    Done setting locale.");
 	}
+	else
+	{
+	    if ( file existing( locale settings file[] )  )
+	    {
+		echo("    Found: ", locale settings file[] );
+		rv[] = directory create silently( user settings directory[] );
+		if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
+
+		file copy multiple overwrite all(  ".", user settings directory[], locale settings file[] ); 
+	        file delete ( locale settings file[] );
+	    }
+	    else
+	    {
+
+		echo("    No locale settings have been defined yet.");
+
+		table copy table( loc, loc1 );
+		table consolidate( loc1, Language );
+		table process( loc1, [Choice] = chr( row()+64 ) );
+		echo(new line,"    Step 1 - Choose language:");
+		lang[] = table menu quick( loc1, Choice, Language, Language );
+
+		table copy table( loc, loc1 );
+		table keep selected rows( loc1, [Language]=lang[] );
+		table process( loc1, [Choice] = chr( row()+64 ) );
+		echo(new line,"    Step 2 - Choose country:");
+		locale[] = table menu quick( loc1, Choice, Country, Locale );
+
+	    	echo("    Locale chosen: ", locale[], " ( ", [loc:Locale,locale[],Language]," / ",[loc:Locale,locale[],Country],"." );
+
+		set locale( locale[], "List of Locales.csv" );
+		echo("    Done setting locale.");
+	    }
+	}
+
+
 
 	system( "chown -R " + system info[user name] + " " + quote path(dir[user application data]) );
 
@@ -404,75 +616,132 @@
 	//
 
 
-	echo(new line, "9 >> Program Licensing ..." , new line);
+	echo(new line, "11 >> License activation ..." , new line);
 
-	if (existing(license[Key]))
+	reply[] = pick if existing and valid(long options['license'], '' );
+	if (batch[] & reply[] = '') reply[] = new; // Default: 
+
+	switch( reply[] )
 	{
-		echo("    A license key is available or has been preserved from previous application");
+	    case (no)
+	    {
+		echo("    No license will be applied. B4P will run in demo mode.");
+		file delete silently( license file name[] );
+	    }
+	
+	    case (new,keep)
+	    {
+		echo("    The existing or preserved license file will be used.");
+		if (file existing( license file[]) = false) 
+		    throw("'B4P License File.json' is missing in the installation directory");
+		variable load( license[], license file[] );
 		rv[] = license apply key( license[Key], license[Holder], choice[]==M );
-		if (rv[]=="OK")
+
+		if (rv[] == OK)
 		{
 			echo("    License key has been accepted.", new line, "    Holder: ", license[Holder]);
 		}
 		else:	throw("License not accepted - " + rv[]);
-	}
-	else: if (file existing(license file[]))
-	{
-		echo("    A license file is already provided in this installation package and will be used.");
+	    }
 
-		rv[] = directory create silently( dir[license] );
-		if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
-
-		file copy multiple overwrite all( ".", dir[license], license file[] ); 
-	}
-	else // No license info taken over
-	{
-	    echo(new line, "License activation ...", new line );
-	    echo("    Specify the license file (typically called 'B4P Licsense File.json'), or" );
-	    echo("    press [Enter] to skip this and run B4P in demo mode with some restrictions." );
-
-	    rv[] = '';
-	    do
+	    case( +'*.json' ) // License file, plus sign means ignore case
 	    {
-		license[path name] = input("    Enter path + file name or press [Enter] to skip" + new line + "    --> ", literal );
-		if (license[path name]=='')
-		{
-		    echo("    Nothing entered.  B4P will be activated in demo mode.");
-		    break loop;
-		}
-
+		echo("    A license file name has been specified: ", reply[]);
+		license[path name] = reply[];
 		if (!file existing( license[path name] ))
 		{
-		    echo(new line, "    Directory or file not found. Please retry." );
-		    continue loop;
+		    throw("License file name provided as command option not found: "+ license[path name] );
 		}
 
 		variable load( license[], license[path name] );
-
 		rv[] = license apply key( license[Key], license[Holder], choice[]==M );
 		if (rv[]=="OK")
 		{
 			echo("    License accepted.  Thank you.  Holder is ", license[Holder]);
 		}
-		else:	echo("    ", rv[], "  Please retry.");
+		else:	throw("License not accepted - " + rv[]);
 	    }
-	    while(rv[]<>"OK");
+
+	    case ('')
+	    {
+
+		if (existing(license[Key]))
+		{
+			echo("    A license key is available or has been preserved");
+			echo("    from the previous installation.");
+
+			rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+			if (rv[]=="OK")
+			{
+				echo("    License key has been accepted.", new line, "    Holder: ", license[Holder]);
+			}
+			else:	throw("License not accepted - " + rv[]);
+		}
+		else: if (file existing(license file[]))
+		{
+			echo("    A license file is already provided in this installation package and will be used.");
+
+			rv[] = directory create silently( license directory[] );
+			if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
+			file copy multiple overwrite all( ".", license directory[], license file[] ); 
+		}
+		else // No license info taken over
+		{
+		    echo(new line, "License activation ...", new line );
+		    echo("    Specify the license file (typically called 'B4P Licsense File.json'), or" );
+		    echo("    press [Enter] to skip this and run B4P in demo mode with some restrictions." );
+	
+		    rv[] = '';
+		    do
+		    {
+			license[path name] = input("    Enter path + file name or press [Enter] to skip" + new line + "    --> ", literal );
+			if (license[path name]=='')
+			{
+			    echo("    Nothing entered.  B4P will be activated in demo mode.");
+			    break loop;
+			}
+
+			if (!file existing( license[path name] ))
+			{
+			    echo(new line, "    Directory or file not found. Please retry." );
+			    continue loop;
+			}
+
+			variable load( license[], license[path name] );
+
+			rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+			if (rv[]=="OK")
+			{
+				echo("    License accepted.  Thank you.  Holder is ", license[Holder]);
+			}
+			else:	echo("    ", rv[], "  Please retry.");
+		    }
+		    while(rv[]<>"OK");
+		}
+	    }
+	    else:
+	    {
+		throw("The value '" + reply[] + "'provided with the command option '--license' is not supported." );
+	    }
 	}
 
 
+
+
 	system( "chown -R " + system info[user name] + " " + quote path(dir[user application data]) );
-
-
-	echo(new line, ">>  Congratulations! Installation has completed.", new line);
-
-
-
 	my program directory[] = system info[user directory] + slash[] + principal b4p folder name[];
 
 	// Final step: Make sure the own files are really owned by user and not the root
 
-	echo;
-	reply[] = input quick ignore case(new line + "    Do you want to create a personal B4P program folder ? ", NY );
+	echo(new line, "12 >> Opion: Creating a personal folder ..." , new line);
+
+	reply[]= select if( batch[], N, '');
+	if (existing(long options['create-personal-folder'])) reply[] = Y;
+
+	if (reply[]='')
+	{
+	    reply[] = input quick ignore case(new line + "    Do you want to create a personal B4P program folder ? ", NY );
+	}
 	if (reply[] = Y)
 	{
 	    echo("    Creating directory: ", my program directory[] );
@@ -494,8 +763,11 @@
 	    echo(new line, "    Done creating this directory.");
 	    echo(          "    When you start B4P without file specified, 'Main.b4p' in this directory will be started.");
 	}
+	else: echo("    A new personal folder will not be created.");
+
 
 	echo;
+	echo(new line,  ">>  Congratulations! Installation has completed.");
 	echo(new line,  "    Highly advisable to restart your machine so all configuration settings for this installation are in effect.", new line, new line );
 
 
@@ -503,8 +775,10 @@
 	{
 		echo(new line, "*** An error occurred during the installation process ***", new line);
 		echo("    Message: ", msg[] );
+		echo("    For help, add the option '--help' to the command to start the installation");
 		echo("    Installation procedure will be stopped", new line, new line);
-		exit;
 	}
+
+	sleep(3);
 
 }
