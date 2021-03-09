@@ -390,13 +390,13 @@ define procedure and function( get long options, {{ valid option names, to param
 		}
 	    }
 
-
-	    if (directory existing( user settings directory[] ))
+	    if (directory existing( dir[user application data] ))
 	    {
-		file copy multiple overwrite all(  user settings directory[], ".", "*.json" );  // Copy all settings file to local installation directory
-		file copy multiple overwrite all(  user settings directory[], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
-		file copy multiple overwrite all(  user settings directory[], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
+		file copy multiple overwrite all(  dir[user application data], ".", "*.json" );  // Copy all settings file to local installation directory
+		file copy multiple overwrite all(  dir[user application data], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
+		file copy multiple overwrite all(  dir[user application data], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
 	    }
+
 
 
 	    if (license file existing[])
@@ -567,10 +567,10 @@ define procedure and function( get long options, {{ valid option names, to param
 	    if ( file existing( locale settings file[] )  )
 	    {
 		echo("    Found: ", locale settings file[] );
-		rv[] = directory create silently( user settings directory[] );
+		rv[] = directory create silently( dir[user application data] );
 		if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
 
-		file copy multiple overwrite all(  ".", user settings directory[], locale settings file[] ); 
+		file copy multiple overwrite all(  ".", dir[user application data], locale settings file[] ); 
 	        file delete ( locale settings file[] );
 	    }
 	    else
