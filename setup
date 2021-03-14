@@ -9,6 +9,11 @@
 // 1.02		10.08.2020	Adaptation to B4P 8.00 / Rebranding
 // 1.03		12.11.2020	Included the My B4P Init.b4p file
 // 1.04		21.02.2021	Include style theme sheet installation
+// 1.10		08.03.2021	Batch mode installation supported
+// 1.11		14.03.2021	Outputs version info
+
+version[] 			= "1.11 2021-03-14 (Linux & MacOS)";
+runtime settings[verbose]	= quiet;
 
 
 define procedure and function( get long options, {{ valid option names, to parameters members to literal}}, 0, 1 )
@@ -26,7 +31,7 @@ define procedure and function( get long options, {{ valid option names, to param
 	    arg[] -= '--';
 	    if (parameter count[] >= 1) if ( find( valid option names[], left( arg[], "=") ) < 0 )
 	    {
-	        exception( stop, compose("Function 'get long options': long option '--", arg[], "' in the command line is not valid."), -1);
+	        throw( compose("Function 'get long options': long option '--", arg[], "' in the command line is not valid."));
 	    }
 	    count[]++;
 	    global() long options[left( arg[], '=' )] = select if( (arg[] = '*=*'), best type(right( arg[], "=" )), null() );
@@ -36,7 +41,7 @@ define procedure and function( get long options, {{ valid option names, to param
 }
 
 {
-	echo(new line, "B4P installation program is starting (Linux and MacOS platforms) ... ");
+	echo(new line, "B4P installation program ", version[], " is starting ... ");
 
 	if (system info[operating system] <> Linux, MACOS)
 	{
@@ -137,13 +142,13 @@ define procedure and function( get long options, {{ valid option names, to param
 	{
 	    batch[] = true;
 	    runtime settings[exit directly] = true;
-	    available choices[] = { machine, user, deinstall, info, exit }; // Note: 'user' choice applies for windows only.
+	    available choices[] = { machine, deinstall, info, exit }; // Note: 'user' choice applies for windows only.
 	    if ( find( available choices[], long options[choice]) < 0 )
 	    {
 		throw( compose( "Encountered invalid value assigned to long option '--choice': ", long options[choice], new line, "    Valid choices are: ", join(available choices[],", "), "." ) );
 	    }
 	    echo("    Recognized command line long option: --choice=", long options[choice] );
-	    choice[] = +long options[choice]{0}; // M for machine, U for user and D for de-install (1st character moved to upper case
+	    choice[] = +long options[choice]{0}; // M for machine, and D for de-install (1st character moved to upper case
 	}
 	else
 	{
@@ -151,16 +156,12 @@ define procedure and function( get long options, {{ valid option names, to param
 	    choice[] = table menu quick( menu, Choices, Explanations, Selections );
 	}
 
-	if (choice[] = E) exit;
+	if (choice[] = E) throw(exit);
 
 	if ( (choice[] = D) & !batch[] )
 	{
 	    reply[] = input quick ignore case(new line + "    A t t e n t i o n" + new line + "    Are you sure you want to de-install B4P? ", NY );
-	    if (reply[]<>Y)
-	    {
-		if (batch[]) abort;
-		exit;
-	    }
+	    if (reply[]<>Y) throw(exit);
 	}
 
 	if (choice[] = I)
@@ -187,9 +188,7 @@ define procedure and function( get long options, {{ valid option names, to param
 		echo		("    --> Please send this .JSON file out by mail in order to receive the license key.");
 		echo( new line, "Done", new line, new line );
 
-		sleep(3);
-		if (batch[]) abort;
-		exit;
+		throw(exit);
 	}
 
 
@@ -390,13 +389,13 @@ define procedure and function( get long options, {{ valid option names, to param
 		}
 	    }
 
+
 	    if (directory existing( dir[user application data] ))
 	    {
 		file copy multiple overwrite all(  dir[user application data], ".", "*.json" );  // Copy all settings file to local installation directory
 		file copy multiple overwrite all(  dir[user application data], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
 		file copy multiple overwrite all(  dir[user application data], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
 	    }
-
 
 
 	    if (license file existing[])
@@ -425,7 +424,7 @@ define procedure and function( get long options, {{ valid option names, to param
 		else
 		{
 		    echo("    Old license file will be kept.");
-		    file copy multiple overwrite all( license directory[], ".", license file[] ); // Keep license file as new location may be different
+		    file copy multiple overwrite all( dir[license], ".", license file[] ); // Keep license file as new location may be different
 		}
 	    }
 	}
@@ -456,12 +455,8 @@ define procedure and function( get long options, {{ valid option names, to param
 
 	if (choice[] = D)
 	{
-		echo(new line, "De-installation completed.", new line);
-	if (choice[] = D)
-	{
 		echo(new line, "De-Installation completed.", new line);
-		if (batch[]) abort;
-		exit;
+		throw(exit);
 	}
 
 	//
@@ -681,9 +676,9 @@ define procedure and function( get long options, {{ valid option names, to param
 		{
 			echo("    A license file is already provided in this installation package and will be used.");
 
-			rv[] = directory create silently( license directory[] );
+			rv[] = directory create silently( dir[license] );
 			if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
-			file copy multiple overwrite all( ".", license directory[], license file[] ); 
+			file copy multiple overwrite all( ".", dir[license], license file[] ); 
 		}
 		else // No license info taken over
 		{
@@ -749,7 +744,7 @@ define procedure and function( get long options, {{ valid option names, to param
 	    echo("    will not be overwritten." );
 
 	    rv[] 			= directory create silently( my program directory[] );
-	    if 				(rv[] <> 'OK','Directory already existing') throw("Unable to create this directory: " + rv[]);
+	    if 			(rv[] <> 'OK','Directory already existing') throw("Unable to create this directory: " + rv[]);
 	    file copy multiple all	( ".", my program directory[], {main.b4p, hello world.b4p, start B4P here.b4p, interactive.b4p} );
 	    file copy overwrite		( required files 2[Manual], my program directory[] + slash[] + required files 2[Manual] );
 	    starting directory		( my program directory[] );
@@ -773,12 +768,19 @@ define procedure and function( get long options, {{ valid option names, to param
 
 	catch( msg[] )
 	{
+	    if (msg[]<>exit)
+	    {
 		echo(new line, "*** An error occurred during the installation process ***", new line);
 		echo("    Message: ", msg[] );
 		echo("    For help, add the option '--help' to the command to start the installation");
 		echo("    Installation procedure will be stopped", new line, new line);
+	    }
+	    else
+	    {
+	        echo("Exit - Installation program is exiting.");
+	    }
 	}
 
-	sleep(3);
+	sleep(2);
 
 }
