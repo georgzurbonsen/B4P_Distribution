@@ -2,6 +2,12 @@
 Explore powerful language for processing large tables and big tables
 
 
+# Compress b4p_installation folder
+# https://coolestguidesontheplanet.com/how-to-compress-and-uncompress-files-and-folders-in-os-x-lion-10-7-using-terminal/
+```
+tar -zcvf   B4P_8_01c_Installation_64_bit_MACOS.tar.gz    b4p_installation
+```
+
 # Building for MACOS
 This uses the B4P sources for Linux, and builds for MacOS
 
