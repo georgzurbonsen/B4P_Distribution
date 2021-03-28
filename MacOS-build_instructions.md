@@ -1,7 +1,3 @@
-# Beyond4P_Distribution
-Explore powerful language for processing large tables and big tables
-
-
 # Building for MACOS
 This uses the B4P sources for Linux, and builds for MacOS
 
@@ -9,13 +5,7 @@ __Requirements__
 1. Beyond4P_Code  (git pull; copy to cpp folder)
 2. Beyond4P_Installation_Linux (git pull; copy to cpp folder)
 3. Beyond4P License File.json (download; copy to cpp folder)
-
-
-__Beyond4P_Code folder__: change 'stdafx.h' file: 
-```text
-#define _MACOS  -> define _MACOS
-#define _UTF8   -> define _UTF8
-```
+4. 
 
 __XCODE Application__
 1. Create new Xcode project
@@ -33,15 +23,13 @@ __XCODE Application__
 
 __Beyond4P_Distribution folder__:
 1. unzip Beyond4P_Installation_LINUX_64bit -> Beyond4P_Intallation
-2. move 'b4p-macos' binary to Beyond4P_Installation folder
-3. copy '/Users/rafael/cpp/Beyond4P License File.json' to Beyond4P_Installation folder
-
+2. move 'b4p-macos' binary to Beyond4P_Installation
+3. copy '/Users/rafael/cpp/Beyond4P License File.json' to Beyond4P_Installation
 
 __Beyond4P_Installation folder__:
 1. delete Beyond4P binary
 2. rename 'b4p-macos' to 'Beyond4P'
 3. change permissions all all files and folders in Installation folder to 755
-
 
 __Installation__
 ```text
@@ -67,7 +55,10 @@ __Testing__
 > ./Hello World.b4p
 ```
 
+__Compress b4p_installation folder__
+```
+tar -zcvf   B4P_8_01c_Installation_64_bit_MACOS.tar.gz    b4p_installation
+```
+Link:  https://coolestguidesontheplanet.com/how-to-compress-and-uncompress-files-and-folders-in-os-x-lion-10-7-using-terminal/
 
 
-
-Notes:  https://guides.github.com/features/mastering-markdown/
