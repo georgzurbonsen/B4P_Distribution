@@ -1,0 +1,1045 @@
+
+/*
+	Support Library.b4p
+	____________________________________________________________________________________________________________
+
+
+	A collection of useful functions
+
+	____________________________________________________________________________________________________________
+
+
+	Author:			Georg zur Bonsen
+				Copyright (C) 2021 by Georg zur Bonsen, All Rights Reserved
+
+	Contents:
+
+	If you want to use this library, then you need to specify following function call:   include ( Support Libary )
+	If the library is not in the same directory, then specfiy an appropriate directory path.
+
+
+	Revision History:
+	____________________________________________________________________________________________________________
+
+	Library	B4P		Date		Features
+
+	1.00	7.00		28.02.2020	First release: List tables, view tables with broser
+	1.10	7.01		24.07.2019	Misc. updates
+	1.11	7.01		07.08.2019	Added 'table list', a very simple output function to list / dump small tables
+	2.00	8.00		08.08.2020	Transition to B4P
+	2.01	8.00		2020-08-31	Improved 'table list' to support data entries with line breaks inside
+	2.02	8.00		2020-09-17	Improved 'table list' to support partial table listing
+	2.03	8.00		2020-10-03	Bugfix in 'web docs', and supports Miccrosoft edge
+	2.04	8.00		2020-11-08	changed 'web docs' to 'docs search' and 'docs' opens online manual
+	2.05	8.00		2020-11-13	Version info moved to system variable
+	2.06	8.00		2021-01-03	Cleanup
+	2.07	8.00		2021-03-03	Hardened all functions against collisions with equally named global variables
+	2.10	8.00		2021-05-15	Additional help commands, openweb
+	2.11	8.00		2021-05-22	Bugfix and cleanup in 'table list'
+
+*/
+
+once
+{
+
+	//
+	// Version verification
+	// _________________________________________________________________________________________________________
+	//
+
+	libraries[support library,version info] = "2.06";
+	if (runtime settings[verbose] != quiet) echo("Included: ", "Support Library", "  ", libraries[support library,version info] );
+
+	if (numeral( left( version info[], ' ')) < 8.00)
+	{
+	    echo("Version Mismatch. Prerequisite for using this file 'Support Library.b4p' is B4P Release 8.00 or newer");
+	    echo("Please obtain and install latest available release.");
+	    stop;
+	}
+	
+	include( Utility Library ); // If not done so
+
+
+
+	//
+	// Additional System Variables
+	// _________________________________________________________________________________________________________
+	//
+
+	// Supported web browsers
+
+	libraries[support library,supported browsers,Windows] = { edge, chrome, explorer  };
+	libraries[support library,supported browsers,Linux]   = { brave, chrome, firefox  };
+	libraries[support library,supported browsers,MACOS]   = { brave, chrome, firefox, safari  };
+
+	libraries[support library,supported browsers,Windows,start] = { "start msedge ", "start chrome -a ", "start iexplore "  };
+	libraries[support library,supported browsers,Linux,start]   = { "brave ",        "google-chrome ",   "firefox "  };
+	libraries[support library,supported browsers,MACOS,start]   = { '/usr/bin/open -a "/Applications/Brave Browser.app" ',
+									'/usr/bin/open -a "/Applications/Google Chrome.app" ',
+									'/usr/bin/open -a firefox -g ', 
+									'/usr/bin/open -a "/Applications/Safari.app" ' };
+
+    //
+    // table list (...) - simple listing feature to standard output
+    // _________________________________________________________________________________________________________
+    //
+	
+
+    define procedure( table list, {{ table name, literal }, { option, literal }, { value, numeral } }, 1, -1, 2 )
+    {
+      local // Ensure all variables firstly assigned do not interfere with equally named global variables
+      {
+	if (table existing(table name[]) == false) exception( interactive, compose("Function 'table list': Table '", table name[], "' does not exist.") , 1 );
+
+	len[]		= table length( table name[] );
+	wid[]		= table max width( table name[] );
+
+	if (len[] = 0)
+	{
+	    if (runtime settings[verbose] != quiet) echo(new line, "    Function 'table list': Table '", table name[],"' is empty.", new line);
+	    return;
+	}
+
+	1st  row[]	= 1;
+	last row[]	= len[] - 1;
+	1st  col[]	= 0;
+	last col[]	= wid[] - 1;
+
+	briefly[]	= -1;
+	pause  1st row[]= len[];
+	pause last row[]= -1;
+
+	// Check for valid options
+
+	for ( i[] = 2, i[] < parameter count[], i[]+=2 )
+	{
+	    opt[] = pick if (i[]==2, option[], ('parameter '+literal(i[]  ))[] );
+	    val[] = pick if (i[]==2, value [], ('parameter '+literal(i[]+1))[] );
+
+	    switch( opt[] )
+	    {
+		case (1st row, last row)
+		{
+		    if (val[] < 0) val[] += len[];
+		    if (val[] <=0) val[] = 1;
+		    if (val[] >= len[]) val[] = len[]-1;
+		    (opt[])[] = val[];
+		}
+		case (1st col, last col)
+		{
+		    if (val[] < 0) val[] += wid[];
+		    if (val[] < 0) val[] = 0;
+		    if (val[] >= wid[]) val[] = wid[]-1;
+		    (opt[])[] = val[];
+		}
+		case (briefly)
+		{
+		    briefly[] = max 123( val[], 0);
+		}
+	        else: exception( interactive, compose("Function 'table list':, parameter ", i[]," (option) = '", opt[],"' is not a valid option") , 1 );
+	    }
+	}
+
+	if (briefly[] >= 0)
+	{
+		pause 1st  row[] = 1st  row[] + briefly[]; // 1st row to pause
+		pause last row[] = last row[] - briefly[];
+		if (pause last row[] <= pause 1st row[]) // Reset again
+		{
+		    pause  1st row[] = len[]; 
+		    pause last row[] = -1;
+		}
+	}
+
+	// Step 1: Identify the maximum lengths of each column
+
+	dim( char counts[], wid[], 0 );
+
+	for (x[] = 0, x[] < wid[], x[]++ )
+	{
+		for (y[] = 0, y[] <= last row[], y[]++)
+		{
+		    if ((y[] >= 1st row[]) | (y[] == 0))
+		        if ((y[] < pause 1st row[]) | (y[] > pause last row[])) with table( table name[], y[] )
+		        {
+			    substrings[] = tokenize( literal([x[]]), include blanks, {new line} );
+			    for all parameters( substrings[], substring[] ) 
+			        char counts[x[]] = max( char counts[x[]], substring[]{} );
+		        }
+		}
+	}
+
+	// Step 2: List the table
+
+
+	for (y[] = 0, y[] <= last row[], y[]++) with table ( table name[], y[] )
+	{
+		addtl line[] = false;
+
+		if ((y[] > 0) & (y[] < 1st row[])) continue;
+
+		if ((y[] >= pause 1st row[]) & (y[] <= pause last row[])) 
+		{
+			echo("  ... :");
+			y[] = pause last row[];
+			continue;
+		}
+
+		row contents[]	= deep( literal, {[..wid[]-1]} ); // Always full width
+		row height  []	= max( deep( height, {row contents[]} ) );
+
+		for( h[] = 0, h[] < row height[], h[]++ )
+		{
+		    print( select if( h[] == 0, literal( y[], "????0 :" ), '      :' ) );
+
+		    for (x[] = 1st col[], x[] <= last col[], x[]++ )
+		    {
+			st[] = row contents[]{ x[] };
+			nl[] = find   ( st[], new line );
+			if (nl[]>=0) // Found a new line
+			{
+			    row contents[]{ x[] }	= right( st[], new line );
+			    st[]			= left ( st[], new line );
+			}
+			else	
+			{
+			    row contents[]{ x[] }	= '';
+			}
+
+			print( " ", literal( st[], literal(char counts[x[]]) + "#" ) );
+			if (x[] < last col[]) print( " |" );
+		    }
+		    echo; // Next line
+		}
+	}
+	echo; // Concluding with blank line at the end
+      }
+    }
+
+    //
+    // List B4P Tables
+    // _________________________________________________________________________________________________________
+    //
+
+
+
+    define procedure( __ internal table list __, { { table, literal }, { screen width, numeral } , { page height, numeral } }, 1, 3 )
+    {
+      local // Ensure all variables firstly assigned do not interfere with equally named global variables
+      {
+
+	if (!existing(screen width[])) 	screen width[] = 80;			// Screen width if not provided as parameter
+	if (!existing(page height[]))	page height[] = 10;			// Number of rows to list if not provided as parameter
+
+
+	if ( table existing( table[] ) = false)
+	{
+		echo("Specified table '", table [], "' does not exist. ");
+		return;
+	}
+
+	if ( table length( table[] ) = 0 )
+	{
+		echo("Specified table '", table [], "' is empty. Nothing to list. ");
+		return;
+	}
+
+
+	// Step 1 - Identify column widths for display purposes
+
+	column count[] = table max width( table[] );
+
+	row offset[]  = 0;		 	// Row offset (1st data row to list) Headers are in row 0 and will always be displayed
+	col offset[]  = 0;			// Column offset (1st data column to list)
+
+
+	do cls[] = false;
+
+	dim( max column width[], column count[], 0 );
+	dim( avg column width[], column count[], 0 );
+	dim( eff column width[], column count[], 0 );
+	action[] = "";
+
+
+	x[] = -1; 	// 
+	y[] = -1;	//
+
+	for ( i[]=0, i[] < column count[], i[]++)
+	{
+		vector[] = deep( length, {[ table[]: i[], ] } );;
+
+		max column width[i[]] = max( vector[] );
+		avg column width[i[]] = round up(average( vector[] ), 1);
+		if (max column width[i[]] > 20) 
+		{
+			eff column width[i[]] = round up( 0.6 * max column width[i[]] + 0.4 * avg column width[i[]], 1);
+		}
+		else
+		{
+			eff column width[i[]] = max column width[i[]];
+		}
+		if ( eff column width[i[]] > 70 ) eff column width[i[]] = screen width[] - 10;
+	}
+
+	
+	do
+	{
+
+		// Identify number of columns which can be displayed so they fit on the screen
+
+		char count[] = 0;
+		col count to display[] = 0;
+		for ( i[] = col offset[], i[] < column count[], i[]++ )
+		{
+			if ( (char count[] + eff column width[i[]]) > (screen width[]-10))
+			{
+				col count[] = i[];
+				break;
+			}
+			else
+			{
+				char count[] += eff column width[i[]] + 1;
+				col count to display[]++;
+			}
+		}
+		
+
+		if (action[]!='?')
+		{
+		    if (do cls[]) cls;
+
+		    for ( row[] = 0, row[] <= page height[], row[]++ )
+		    {
+			row to display[] = select if ( row[] == 0, row[], row[] + row offset[] );
+			print( literal( row to display[],"000000: " ) );
+
+			for (col[] = col offset[], col[] < col offset[]  +col count to display[], col[]++ )
+			{
+				value[] = literal([ table[] : col[], row to display[] ]);			// Enforce literal value
+				substitute all( value[], new line, ' ' );
+				value[] = literal( value[], literal( eff column width[col[]] ) + "# " );	// Pad or limit number of chars
+				print( value[] );
+			}
+			echo;
+
+			if (row[]==0)
+			{
+			    print("        "); // Indentation
+			    for (col[] = col offset[], col[] < col offset[]  +col count to display[], col[]++ )
+			    {
+				value[] = literal( "", literal( eff column width[col[]] ) + "- " );	// Pad or limit number of chars
+				print( value[] );
+			    }
+			    echo;
+			}
+		    }
+		}
+		echo( literal("","79_") );
+		action[] = input quick ( "Action ([?] for help): ", "cNnWwUuDdLlRrPpXxYyGgSsQq?" + escape + chr(3) );
+		check( action[] )
+		{
+		    case ("?")
+		    {
+			echo("Navigation: l = Left,      r = Right       u = Page Up   d = Page Down   s = Search next" );
+			echo("            L = 1st Col.   R = Last Col.   U = Top       D = Bottom      S = Search" );
+			echo("            n = 1 column  narrower         w = 1 column wider            c = ClS on/off");
+			echo("            N = 5 columns narrower         W = 5 columns wider");
+			echo("            X = Change Screen Width        P = Change Page Height", new line );
+			echo("            Q = Quit", new line);
+			echo("Procedure call  :  view ( table name [, chars per row [, rows to show]] )");
+			echo("            e.g.:  view ( my table, 160, 20 ) // My table, 160 chars, 20 rows to show", new line);
+		    }
+		    case ('c')		do cls[] = !do cls[];
+		    case ('n')		eff column width[ col offset[]] = max(eff column width[ col offset[]]-1,4);
+		    case ('N')		eff column width[ col offset[]] = max(eff column width[ col offset[]]-5,4);
+		    case ('w')		eff column width[ col offset[]] = min(eff column width[ col offset[]]+1,screen width[]-10);
+		    case ('W')		eff column width[ col offset[]] = min(eff column width[ col offset[]]+5,screen width[]-10);
+		    case ('U') 		row offset[] = 0;
+		    case ('u') 		row offset[] = max(row offset[] - page height[],0);
+		    case ('D') 		row offset[] = round down( table length(table[])-1, page height[] );
+		    case ('d')
+		    {
+			row offset[] += page height[];
+			if (row offset[] > table length(table[])-1) row offset[] = round down( table length(table[])-1, page height[] );
+		    }
+		    case ('L') 		col offset[] = 0;
+		    case ('l') 		if (col offset[] > 0) col offset[]--;
+		    case ('R') 		col offset[] = max(0,column count[]-1);
+		    case ('r') 		if (col offset[] < column count[]-1) col offset[]++;
+		    case ('P','p')	page height[] = input( "Enter new page height (5 - 100): ", integer, (5..100) );
+		    case ('X','x')
+		    {
+			screen width[] = input( "Enter new screen width (40 - 400): ", integer, (40..400) );
+
+		    }
+		    case ('Y','y')
+		    {
+			page height[] = input( "Enter # rows to show (5 - 100): ", integer, (5..100) );
+
+		    }
+		    case ('G','g')
+		    {
+			target row[] = input( "Enter row number (1 - " + literal(table length(table[])-1) + "): ", integer, (1..(table length(table[])-1)) )-1;
+			row offset[] = round down( target row[], page height[] );
+		    }
+
+		    case ('s')
+		    {
+			if (x[]=-1) action[] = 'S'; 
+			else: x[]++;
+		    }
+		    case ('S','s')
+		    {
+			if (action[]='S')
+			{
+			    y[] = 0; x[] = 0;
+			    expr[] = input( "Enter search expression: ", literal );
+			}
+			rv[] = table search( table[], :expr[], y[], x[] );
+			if (rv[] = false)
+			{
+				echo("Searching for expression ", expr[], "  -- No match.");
+				y[] = 0; x[] = 0;
+			}
+			else
+			{
+				echo("Searching for expression ", expr[], "  -- Found in row ", y[], " and column ", x[]);
+				row offset[] = max(y[]-1,0);
+				col offset[] = x[];
+			}
+		    }
+		}
+	}
+	while ( +action[] <> 'Q', escape, chr(3) );
+      }
+    }
+
+
+    //
+    // View B4P Tables with Browsers
+    // _________________________________________________________________________________________________________
+    //
+
+
+    libraries[support library,browser excel file counter] = 0;	// Different file for every opening so the files are pushed onto Excel
+
+
+
+
+//
+// Following procedure upgrades HTML files saved with B4P to view with DataTables.
+//
+// All codes provided by SpryMedia Ltd, Scottland, are under the MIT license
+// This includes all related CSS and Javascipt code
+// Copyright Copyright (C) 2008-2020, SpryMedia Ltd.
+//
+// Known issues: Do not include any formatting (e.g. colors, different fonts, etc.) so far.
+//
+
+define procedure( __ prepare HTML for DataTables __, { { file name, literal } } )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	table load		( _data_table, file name[], TEXT );
+
+	[_data_table:0,0] = 	"<!-- Datatable --> "; // Clear table 0
+	[_data_table:0,1] = 	[_data_table:0,1] - "<table  >"; // Remove the opening <table>.
+
+	path[] =		replace all( system info[program directory b4p] + "/", "\", "/" );
+
+	preamble[] = 
+	{	'<html><head><link rel="stylesheet" type="text/css" href="' + path[] + 'weblib/datatables/css/jquery.dataTables.min.css"></head>',
+		'<body>',
+		'<script type="text/javascript" charset="utf8" src="' + path[] + 'weblib/jquery/jquery-3.4.1.js"></script>',
+		'<script type="text/javascript" charset="utf8" src="' + path[] + 'weblib/datatables/js/jquery.dataTables.min.js"></script>',
+		'<table id="example" class="display compact order-column" style="width:100%">'
+	};
+	
+	trailer[] = 
+	{	// </table is already part of table
+		"<script> $(document).ready( function() { $('#example').DataTable(); } );  </script>",
+		'</body></html>',
+	};
+
+	table insert rows	( _data_table, 1, preamble[]{} );
+	[_data_table:0,..] = 	preamble[];
+
+	header row[] = 		preamble[]{}+1;
+
+	table header[] = 	[_data_table:0,header row[]];
+	table footer[] = 	"</tbody><tfoot>" + table header[] + "</tfoot>";
+	table header[] = 	"<thead>" + table header[] + "</thead><tbody>";
+
+	[_data_table:0,header row[]] = 			table header[];
+	[_data_table:0,table length(_data_table)-2] = 	table footer[] + "</table>";
+
+	table append		( _data_table, trailer[] );
+	table save 		(_data_table, file name[], new line );
+	table delete		( _data_table );
+    }
+}
+
+
+
+
+//
+// Delete all temporary files created in the working directory
+//	
+
+define procedure ( view reset ) // Clears all temprary files created.
+{
+	local() files[] = search files( ".", "_b4p_view*" );
+	if (files[] = {})
+	{
+	    echo("No temporary files to delete.");
+	}
+	else
+	{
+	    echo("Identified following files: ", join( files[], ", ") );
+	    pause("Continue with deleting these files?");
+	    file delete( files[] );
+	    echo("Done deleting.");
+	}
+}
+
+
+
+//
+// Open a web page
+//	
+
+define procedure ( openweb, { { url name, literal }, { browser, literal } }, 1, 2 )
+{
+    switch( function name[] ) // Names orignate from 'define additional procedure' calls below end of this function definition
+    {
+	case ( help welcome, docs )		url name[] = "https://www.b4p.app/index.html";
+	case ( help index, help keywords )	url name[] = "https://www.b4p.app/LIB_Features_Index.html";
+	case ( help user guide )		url name[] = "https://www.b4p.app/GUI_Features_User_Guide.html";
+	case ( help language )			url name[] = "https://www.b4p.app/LAN_Features_Language_Guide.html";
+	case ( help functions, help library )	url name[] = "https://www.b4p.app/LIB_Features_Function_Library.html";
+    }
+
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	supported browsers[] = libraries[support library,supported browsers,system info[ operating system ]];
+	browser found[] = false;
+
+	if (!existing(browser[])) // No browser specified
+	{
+	    attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Browser", browser[] ); // Used memorized browser
+	    browser found[] = true;
+	}
+
+	browser nr[] = find( supported browsers[], browser[] );
+	if (browser nr[] < 0)
+	{
+	    if (function name[] = 'help *',docs)
+	    {
+	        echo("Note: Specify the browser name in the 1st parameter:  " + function name[] + "( browser name ) for the first time ");
+	    }
+	    else
+	    {
+	        echo("Note: Specify the browser name in the 2nd parameter:  " + function name[] + "( web page name, browser name ) for the first time ");
+	    }
+	    echo("      B4P will memorize the browser for the next time unless changed again.");
+	    echo("      Available browsers are: ", join( supported browsers[], ", " ), new line );
+	    exception( interactive, "    Retry calling this function with an existing browser.", -1 );
+	}
+
+	if (!browser found[]) // Save specified browser
+	{
+	    attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Browser", browser[] ); // Memorize it
+	}
+
+	command[] = libraries[support library,supported browsers,system info[ operating system ],start]{browser nr[]};
+
+	command[] += '"' + url name[] + '"';
+	if (system info[operating system]<>Windows) command[] += " &"; // Non-Windows: start task in background
+	system( command[] );
+
+    }
+}
+
+define additional procedure( help index,      openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help keywords,   openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help welcome,    openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help user guide, openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help language,   openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help functions,  openweb, { { browser, literal } }, 0, 1 );
+define additional procedure( help library,    openweb, { { browser, literal } }, 0, 1 );
+
+define additional procedure( docs,	      openweb, { { browser, literal } }, 0, 1 );
+
+
+
+
+
+//
+// Saves the table into a file and opens the browser or Excel immetiately thereafter
+//	
+
+
+define procedure ( view, { { table name, literal }, { browser, literal } }, 1, 2 )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+
+	except[] = false;
+	switch( system info[ operating system ] )
+	{
+	    case (Windows) 	supported browsers[] = { here, edge, edge datatables, chrome, chrome datatables, explorer, explorer datatables, excel, excel html, excel xml };
+	    case (Linux)	supported browsers[] = { here, brave, brave datatables, chrome, chrome datatables, firefox,  firefox datatables };
+	    case (MACOS)	supported browsers[] = { here, chrome, chrome datatables, firefox,  firefox datatables, safari, safari datatables, brave, brave datatables};
+	    else:		exception( interactive, "Function 'view': Operating system not known: " + system info[ operating system ], -1 );
+	}
+
+	if (!existing(browser[]))
+	{
+	    attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Browser", browser[] ); // Used memorized browser
+	}
+	else
+	{
+	    if (find( supported browsers[], browser[] ) < 0)
+	    {
+		except[] = true;
+	    }
+	    else
+	    {
+	        attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Browser", browser[] ); // Memorize it
+	    }
+	}
+
+	if (browser[] == here)
+	{
+		__ internal table list __( table name[] );
+		return;
+	}
+
+
+	type[] = ".html";
+	option[] = HTML;
+
+	// Include MIT datatable features
+	datatables[] = false;
+	if (find(browser[],datatables)>=0)
+	{
+
+	    browser[] -= ' datatables';
+	    datatables[] = true;
+	}
+
+	if (!except[]) switch ( system info[ operating system ] )
+	{
+	    case ( Windows )
+	    {
+		switch( browser[])
+		{
+		    case (edge)		  command[] = "start msedge ";
+		    case (chrome)	  command[] = "start chrome -a ";
+		    case (explorer)	  command[] = "start iexplore ";
+		    case (excel)	{ command[] = "start excel /r "; type[] = ".csv"; option[] = LOCAL; }
+		    case (excel html)	  command[] = "start excel /r ";
+		    case (excel xml)	{ command[] = "start excel /r "; type[] = ".xls"; option[] = EXCEL; }
+		    else:		  except[] = true;
+		};
+ 	    }
+	    case ( Linux )
+	    {
+		switch( browser[])
+		{
+		    case (chrome)	  command[] = "google-chrome ";
+		    case (brave)	  command[] = "brave ";
+		    case (firefox)	  command[] = "firefox ";
+		    else:		  except[] = true;
+		};
+	    }
+	    case ( MACOS )
+	    {
+		switch( browser[])
+		{
+		    case (chrome)	  command[] = '/usr/bin/open -a "/Applications/Google Chrome.app" ';
+		    case (brave)	  command[] = '/usr/bin/open -a "/Applications/Brave Browser.app" ';
+		    case (safari)	  command[] = '/usr/bin/open -a "/Applications/Safari.app" ';
+		    case (firefox)	  command[] = '/usr/bin/open -a firefox -g ';
+		    else:		  except[] = true;
+		}
+	    }
+	}
+
+	if (except[])
+	{
+	    echo("Note: Specify the browser in the 2nd parameter:  view( table name, browser name ) for the first time ");
+	    echo("      B4P will memorize the browser for the next time unless changed again.");
+	    echo("      Available browsers are: ", join( supported browsers[], ", " ), new line );
+	    exception( interactive, "    Retry with view ( table name, browser name )", -1 );
+	}
+
+
+
+	file name[] = "_b4p_view_" + table name[] + select if( browser[]==excel, literal(libraries[support library,browser excel file counter]++),"" ) + type[];
+	table save ( table name[], file name[], option[] );
+
+	if (datatables[]) 
+	{
+		__ prepare HTML for DataTables __( file name[] );
+	}
+
+	command[] += '"' + working directory() + system info[directory separator] + file name[] + '"';
+	if (system info[operating system]<>Windows) command[] += " &"; // Non-Windows: start task in background
+	system( command[] );
+
+	if (function name[]=view pause) pause("Displaying table '" + table name[] + "'" );
+    }
+}
+
+    //
+    // Following function works like 'view', but will pause before continuing.
+    //	
+
+
+    define additional procedure ( view pause, view, { { table name, literal }, { browser, literal } }, 1, 2 );
+
+
+    //
+    // Interactive help features
+    // _________________________________________________________________________________________________________
+    //
+
+
+
+    define procedure ( help )
+    {
+      local // Ensure all variables firstly assigned do not interfere with equally named global variables
+      {
+	file name[] = system info[program directory b4p] + system info[directory separator] + "lib" + system info[directory separator] + "Interactive Help.txt";
+
+	saved[] = runtime settings[verbose]; 
+	runtime settings[verbose] = quiet;
+
+	table load( __ help __, file name[], TEXT );
+	runtime settings[verbose] = saved[];
+
+	table insert columns	( __ help __, Section, 0 );
+	table process		( __ help __, [Section] = literal([Contents]){0}; [Contents] = right(literal([Contents]),-2) ); // Remove digit and tab
+
+	section[] = 0;
+	last section[] = max 123 ( [__ help __ : Section, ..] );
+
+	do cls[]= false;
+
+	do
+	{
+		echo;
+		if (do cls[]) cls;
+		table process selected rows( __ help __, [Section]==section[], echo( [Contents] ) );
+		echo( literal("","79_") );
+		action[] = +input quick ignore case ( compose( "Page [0]..[", last section[], "], [N]ext  [P]revious page  Clear [S]creen on/off  [Q]uit: "), join( { 0 .. last section[] } ) + "NPSQ"   );
+
+
+		switch(action[])
+		{
+		    case( '0' .. literal(last section[]))	section[] = numeral( action[] );
+		    case( N )					if (section[] < last section[] ) section[]++;
+		    case( P )					if (section[] > 0 ) section[]--;
+		    case( S )					do cls[] = !do cls[];
+		}
+	}
+	while ( action[] <> 'Q' );
+	table delete ( __ help __ );
+      }
+    }
+
+
+
+    //
+    // Open web documentation
+    // _________________________________________________________________________________________________________
+    //
+
+
+    define procedure ( docs search, {{ keyword, literal }, { browser, literal }}, 0, 2 )
+    {
+      local // Ensure all variables firstly assigned do not interfere with equally named global variables
+      {
+	url[]				= "https://www.b4p.app/";
+	temp dir[] 			= system info[temp directory] + system info[directory separator];
+	toc file[]			= temp dir[] + "TOC.csv"; // Table of contents
+	docs file[]			= "LIB_Features_Table_of_Contents.html";
+
+	saved[] = runtime settings[verbose]; 
+	runtime settings[verbose] = quiet;
+
+	if (function name[] <> docs)
+	{
+		echo(new line, "Accessing B4P on-line documentation ..." );
+		echo(new line, "Advice:  docs search ( [keyword] ) looks for specific keyword.");
+		echo(          "Exmaple: docs search ( for )	   looks for help for 'for' ");
+		echo(          "         docs search ( 'for*' )	   looks for keywords beginning with 'for' ", new line);
+		echo(          "Use 'single' quotation marks when using wildcard symbols *,?,etc.", new line);
+
+		ret val[] 			= file download overwrite silently( url[] + "TOC.csv" , toc file[] );
+
+		if (ret val[] != OK) exception( interactive, "Function 'docs search': Cannot load table of contents file from the web." + new line + "Check if you have access to the Internet.", -1 );
+
+		mode[] = equals;		// Choices: equals, begins with, contains
+		if (parameter count[] == 0) 	{ keyword[] = ""; mode[] = begins with; } // All contents
+
+		table load			( __ toc __, toc file[] );
+		table process			( __ toc __, all keywords[] += tokenize( [Keywords], {}, "," ); all features[] += tokenize( [Feature Names], {}, "," ) );
+
+		table process 			( __ toc __, [Keywords] = join( parameter set([Feature Names]) | parameter set([Keywords]), "," );
+						[Feature Names] = parameter set([Keywords]){} );
+		table rename column headers	( __ toc __, Feature Names, Keyword Count );
+
+		table insert columns		( __ toc __, {Upper Section Nr, Upper Section Name}, {'',''}, Section Nr );
+		table process			( __ toc __, [Upper Section Nr] = left last match( [Section Nr], '.' ) );
+		table lookup			( __ toc __, Upper Section Nr, Upper Section Name, __ toc __, Section Nr, Section Name );
+
+		table insert selected rows	( __ toc __, true /* all */, [Keyword Count]-1, { Section Nr, Section Name, Upper Section Nr, Upper Section Name, Keywords, HTML File Name }, Keyword Count );
+		table process			( __ toc __, [Keywords] = parameter set([Keywords]){[Keyword Count]} );
+		table delete columns		( __ toc __, Keyword Count );
+		table sort selected rows	( __ toc __, [Section Name] != 'Table of Contents', Keywords, alphabetic ignore case );
+		table keep columns		( __ toc __, { Section Nr, HTML File Name, Upper Section Name, Section Name, Keywords } );
+		table insert columns		( __ toc __, Match );
+
+
+		// Next step: Preselect by entering the keyword
+
+		matches[] = 0;
+		if (parameter count[] > 0)
+		{
+			expr[] = "[Keywords]=+'" + keyword[]+"'";
+			matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+
+			if (matches[] = 0)
+			{
+				expr[] = "[Keywords]=+'" + keyword[]+"*'"; // No match, try with 'begins with'
+				matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+				mode[] = begins with;
+			}
+		}
+		else // List all
+		{
+			matches[] = table process( __ toc __, [Match] = Yes );
+		}
+
+		table copy table 		( __ toc __, __ toc2 __ );
+		table keep selected rows	( __ toc2 __, [Match] = Yes );
+		table insert columns		( __ toc2 __, Choice, "", 0 );
+		table rearrange columns		( __ toc2 __, { Choice, Keywords,HTML File Name } );
+
+		if (matches[] <> 1)
+		{
+			offset[] = 0; // Table offset
+			cls[] = false;
+			window size[] = 18;
+			max offset[] = round down((table length( __ toc2 __ )-1)/window size[]); // window size;
+			done[] = false;
+			do
+			{
+				table copy table selected rows	( __ toc2 __, __ toc3 __, round down((row()-1)/window size[]) = offset[] );
+
+				table process			( __ toc3 __, [Choice] = select if ( row() < 10, row(), chr(row() + 64 - 9) )  );
+	
+				prompt[]  = "Enter choice or  ";
+				choices[] = join( [__ toc3 __ : Choice, .. ] ) + 'XS?'; // and Exit
+				if (offset[] > 0) 		{ choices[] += 'P'; prompt[] += "[P]rev Page  "; } // Previous
+				if (offset[] < max offset[]) 	{ choices[] += 'N'; prompt[] += "[N]ext Page  "; } // Next
+				prompt[] += "[?] to modify your search" + new line + "                 Clear [S]creen on/off    e[X]it : ";
+
+				if (cls[]) cls; else: echo( new line );
+				echo("___ Keywords found ___________________________________________________________ ");
+				count[] = 0;
+				if ( table length( __ toc3 __ ) <= 1 )
+				{
+					echo(new line, "...", new line, "(Nothing found. Press '?' to modify your search)", new line, "..." );
+					count[] = 4;
+				}
+
+				count[] += table process( __ toc3 __ , 
+					u[] = decode entities([Upper Section Name]);
+					echo( [Choice], ' : ', literal([Keywords], "30#*  ")) );  // Do not show upper section name for time being.
+
+				for (i[]=1, i[]<=(window size[]-count[]), i[]++) echo; // Blank rows
+				echo( literal("","79_") );
+				choice[] = input quick ignore case( prompt[], choices[] );
+				switch( choice[] )
+				{
+				    case ('P')		offset[]--;
+				    case ('N')		offset[]++;
+				    case ('S')		cls[] = !cls[];
+				    case ('X')
+					{
+						table delete( __ toc __, __ toc2 __, __ toc3 __ );
+						runtime settings[verbose] = saved[];
+						return;
+					}
+				    case ("?")
+					{
+					    echo(new line, "Narrow down the number of matches for your keyword by typing." );
+					    echo("Press [Enter] to confirm, [Escape] to leave. # matches update automatically.");
+					    echo("Press [?] to toggle between 'begins with', 'contains' and 'equals'.");
+					    echo("Comparison mode is ", mode[], new line );
+
+					    do
+					    {
+						expr[] = "[Keywords]=+'" + select ifs( keyword[], mode[] == begins with, keyword[]+'*', mode[] == contains, '*'+keyword[]+'*' ) + "'";
+
+						matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+
+						print( chr(13), literal( matches[], "???0" ), " matches: ", keyword[] );
+						ch[] = getch();
+						switch( ch[] )
+						{
+						    case( chr(8), chr(127) ) // Backspace, Delete
+						    {
+							if (keyword[]{}>0) keyword[] = keyword[]{0..-2};
+							print(chr(8), "   ");
+						    }
+						    case( "?")
+						    {
+							if 	(mode[] = equals) mode[] = begins with;
+							else:if (mode[] = begins with) mode[] = contains;
+							else:    mode[] = equals;
+							echo(new line, "Comparison mode is set to: ", mode[] );
+						    }
+						    case( >= ' ' ) // Visible characters
+						    {
+							keyword[] += ch[];
+						    }
+						}
+					    }
+					    while (ch[] <> new line, escape);
+
+					    echo (new line);
+
+					    if (ch[] = escape)
+					    {
+					        runtime settings[verbose] = saved[];
+					        table delete( __ toc __, __ toc2 __, __ toc3 __ );
+						runtime settings[verbose] = saved[];
+					        return;
+					    }
+
+					    table copy table 		( __ toc __, __ toc2 __ );
+					    table keep selected rows	( __ toc2 __, [Match] = Yes );
+					    table insert columns		( __ toc2 __, Choice, "", 0 );
+					    table rearrange columns		( __ toc2 __, { Choice, Keywords,HTML File Name } );
+					    offset[] = 0;
+					    max offset[] = round down((table length( __ toc2 __ )-1)/window size[]); // window size;
+
+					}
+				    else:
+					{
+						keyword[] = [__ toc3 __: Choice, choice[], HTML File Name ];
+						done[] = true;
+					}
+				}
+
+			} while (!done[]);
+			table delete ( __ toc3 __ );
+		}
+		else
+		{
+			keyword[] = [ __ toc2 __: HTML File Name, 1 ]; // Only 1 entry inside
+		}
+
+		html file[] = keyword[];
+		table delete ( __ toc __, __ toc2 __ );
+	}
+	else
+	{
+		html file[] = docs file[];
+	}
+	echo("Opening ", html file[], " ..." );
+
+
+	// Identify the web browser
+
+	except[] = false;
+	switch( system info[ operating system ] )
+	{
+	    case (Windows) 	supported browsers[] = { chrome, explorer, edge };
+	    case (Linux)	supported browsers[] = { chrome, firefox, brave };
+	    case (MACOS)	supported browsers[] = { chrome, firefox,  safari, brave  };
+	    else:		exception( interactive, "Function 'view': Operating system not known: " + system info[ operating system ], -1 );
+	}
+
+	if (!existing(browser[])) // Browser Name parameter is not provided, use configured ones
+	{
+	    attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Docu Browser", browser[] ); // Used memorized browser
+	    if (browser[] = '')
+	    {
+		    echo(new line, "Browser is not yet known. Please select browswer which will be memorized for next time.");
+		    for all parameters( supported browsers[], browser[], index[] ) browser menu[] += literal(index[]) + "=" + browser[]+"  ";
+		    browser[] = input quick ( browser menu[], join( {'0'..literal( supported browsers[]{}-1 )} ) );
+		    browser[] = supported browsers[]{numeral(browser[])};
+		    attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Docu Browser", browser[] ); // Memorize it
+	    }
+
+	}
+	else
+	{
+	    if (find( supported browsers[], browser[] ) < 0)
+	    {
+		    echo(new line, "Specified browser name ", browser[], "is unknown. Please select browser (which will be memorized): ");
+		    for all parameters( supported browsers[], browser[], index[] ) browser menu[] += literal(index[]) + "=" + browser[]+"  ";
+		    browser[] = input quick ( browser menu[], join( {'0'..literal( supported browsers[]{}-1 )} ) );
+		    browser[] = supported browsers[]{numeral(browser[])};
+	    }
+	    attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Docu Browser", browser[] ); // Memorize it
+	}
+
+	switch ( system info[ operating system ] )
+	{
+	    case ( Windows )
+	    {
+	        ending[] = "";
+		switch( browser[])
+		{
+		    case (chrome)	  command[] = "start chrome -a ";
+		    case (explorer)	  command[] = "start iexplore ";
+		    case (edge)		  command[] = "start microsoft-edge:";
+		};
+ 	    }
+	    case ( Linux )
+	    {
+	        ending[] = " >/dev/null &";
+		switch( browser[])
+		{
+		    case (chrome)	  command[] = "google-chrome ";
+		    case (firefox)	  command[] = "firefox ";
+		    case (brave)	  command[] = "brave ";
+		};
+	    }
+	    case ( MACOS )
+	    {
+	        ending[] = " >/dev/null &";
+		switch( browser[])
+		{
+		    case (chrome)	  command[] = '/usr/bin/open -a "/Applications/Google Chrome.app" ';
+		    case (brave)	  command[] = '/usr/bin/open -a "/Applications/Brave Browser.app" ';
+		    case (safari)	  command[] = '/usr/bin/open -a "/Applications/Safari.app" ';
+		    case (firefox)	  command[] = '/usr/bin/open -a firefox -g ';
+		    else:		  except[] = true;
+		};
+	    }
+	}
+
+
+	command[] += url[] + html file[] + ending[];
+	system( command[] );
+
+	runtime settings[verbose] = saved[];
+
+      }
+    }
+
+
+
+
+
+
+} // once ()
+
+

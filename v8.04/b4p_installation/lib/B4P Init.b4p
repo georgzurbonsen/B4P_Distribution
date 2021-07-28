@@ -1,0 +1,75 @@
+
+
+/*
+	Init.b4p
+	____________________________________________________________________________________________________________
+
+
+	This script is executed every time B4P is started unless a command switch has suppressed it.
+
+
+	____________________________________________________________________________________________________________
+
+
+	Author:			Georg zur Bonsen
+				Copyright (C) 2019-2020 by Georg zur Bonsen, All Rights Reserved
+
+	Contents:
+
+	This file includes some library files considered part of the standard configuration.
+	If you are experienced, you may consider addding further library calls or your own value-adding features,
+	but this is at your own risk.
+
+	This file is called by B4P using the 'include' command.
+
+
+
+	Revision History:
+	____________________________________________________________________________________________________________
+
+	Library	B4P		Date		Features
+
+	1.00	8.00		2020-11-04	Created
+
+*/
+
+
+once
+{
+	// Step 1: Call "My B4P Init.b4p" if found
+
+	user init file name[] = system info[user app data directory b4p] + system info[directory separator] + "My B4P Init.b4p";
+	user init file existing[] = file existing( user init file name[] );
+	if (user init file existing[])  include( user init file name[] ); // Call for 1st time
+
+
+	// Step 2: Include B4P standard libraries
+
+	include( Utility Library );
+	include( Support Library );
+	include( Office Library );
+	include( Style Library );
+
+
+	// Step 3: Call "My B4P Init.b4p" again to execute remaining code
+
+	if (user init file existing[])  include( user init file name[] ); // Call for 2nd time
+	delete( user init file existing[], user init file name[] );
+
+
+	// Step 4: In case 'main.b4p' has been found automatically, give user the chance to interrupt
+
+	if ( runtime settings[ found main ] )
+	{
+		if ( wait(2 /* seconds */ , "Starting 'Main.b4p' in two seconds...  Press any key to interrupt." ) <> '')
+		{
+			echo("Program start interrupted. Type 'return' to start it again.");
+			interactive;
+		}
+	}
+}
+
+
+
+
+
