@@ -1,6 +1,6 @@
-## Beyond4P_Distribution
+## Beyond4P Distribution
 
-Explore powerful language for processing large tables and big tables
+A language and engine for processing tabular data
 
 ### Installation
 1. Click in 'LATEST' folder
@@ -10,4 +10,10 @@ Explore powerful language for processing large tables and big tables
 5. Type './setup' to launch setup program
 
 
+### Windows Supporting Applications
+1. Terminal:  https://cmder.net/
+2. Visual Studio Code:  https://code.visualstudio.com/
+3. PDF reader: https://www.foxitsoftware.com/pdf-reader
+4. LibreOffice: https://www.libreoffice.org
+5. Visual C++ Runtime (vc_redist.x64):  https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads
 
