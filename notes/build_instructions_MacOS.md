@@ -57,8 +57,12 @@ __Testing__
 
 __Compress b4p_installation folder__
 ```
-tar -zcvf   B4P_8_01c_Installation_64_bit_MACOS.tar.gz    b4p_installation
+tar -zcvf   b4p_installation_MacOS_64bit.tar.gz    b4p_installation
 ```
 Link:  https://coolestguidesontheplanet.com/how-to-compress-and-uncompress-files-and-folders-in-os-x-lion-10-7-using-terminal/
 
 
+
+```
+tar -zcvf   b4p-installation-linux-64bit.tar.gz    b4p-installation-linux-64bit
+```
