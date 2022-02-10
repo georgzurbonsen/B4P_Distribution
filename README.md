@@ -11,8 +11,8 @@ A language and engine for processing tabular data
 
 ### Script
 ```text
-wget https://github.com/georgzurbonsen/Beyond4P_Distribution/blob/master/current/b4p-installation-linux-64bit.tar.gz
-tar -xvzf b4p-installation-linux-64bit.tar.gz
+wget https://github.com/georgzurbonsen/Beyond4P_Distribution/blob/master/current/b4p_linux.tar.gz
+tar -xvzf b4p_linux.tar.gz
 cd b4p_installation/
 sudo ./setup --choice=machine --locale=en_US
 ```
