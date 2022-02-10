@@ -30,6 +30,7 @@
 	Library	B4P		Date		Features
 
 	1.00	8.00		2020-11-04	Created
+	1.01	9.00		2022-01-30	Updated
 
 */
 
@@ -74,10 +75,10 @@ once
 	console[theme colors,accent 3]	= "#a6f2c7";
 	console[theme colors,accent 4]	= "#94B9F0";
 
-	console[theme colors,deco 1]	= "#404040";
-	console[theme colors,deco 2]	= "#606060";
-	console[theme colors,deco 3]	= "#202060";
-	console[theme colors,deco 4]	= "#404080";
+	console[theme colors,deco 1]	= "#202020";
+	console[theme colors,deco 2]	= "#303030";
+	console[theme colors,deco 3]	= "#202040";
+	console[theme colors,deco 4]	= "#303060";
 
 	// Step 4: Call "My B4P Init.b4p" again to execute remaining code
 

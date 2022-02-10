@@ -40,6 +40,7 @@
 	3.00	9.00		2022-01-03	General overhaul
 	3.01	9.00		2022-01-05	Bugfixes
 	3.02	9.00		2022-01-09	Use official HTML entity names for box drawing 
+	3.03	9.01		2022-01-09	Added file browser
 
 */
 
@@ -51,12 +52,12 @@ once
 	// _________________________________________________________________________________________________________
 	//
 
-	libraries[support library,version info] = "3.00";
+	libraries[support library,version info] = "3.03";
 	if (runtime settings[verbose] != quiet) echo("Included: ", "Support Library", "  ", libraries[support library,version info] );
 
-	if (numeral( left( version info[], ' ')) < 9.00)
+	if (numeral( left( version info[], ' ')) < 9.01)
 	{
-	    echo("Version Mismatch. Prerequisite for using this file 'Support Library.b4p' is B4P Release 9.00 or newer");
+	    echo("Version Mismatch. Prerequisite for using this file 'Support Library.b4p' is B4P Release 9.01 or newer");
 	    echo("Please obtain and install latest available release.");
 	    stop;
 	}
@@ -103,7 +104,7 @@ define procedure and function ( browser, { { option, literal } }, 0, 1 )
     local
     {
 	new browser info[] = new line + 'Info: Type &high;browser(set)&previous; to assign a new web browser if needed.' + new line;
-	if (!existing(option[])) option[] = get;  if (option[]='') option[] = get;
+	if (!existing here(option[])) option[] = get;  if (option[]='') option[] = get;
 
 	if (option[]=reset)
 	{
@@ -353,13 +354,21 @@ define procedure( __ internal table display row __, { { table, literal }, { coor
 	    highlight[] =  r[]==p[] & (x[]==(coords[current col]+coords[offset col]) | coords[current col] < 0) & coords[do input];
 
 	    contents[] = [x[]];  // Pick up from table
+	    attr[]='';
+	    if (contents[]{0} >= '&#x100000;')
+	    {
+		attr[] = contents[]{0};
+		contents[] = contents[]{1..-1};
+	    }
+
+
 	    if (coords[wrap]) contents[] = format( { right margin, coords[col widths,x[]], as text, true }, contents[] );
 	    h[] = height( contents[] );
 	    oversize[] = width(contents[])>coords[col widths,x[]] & coords[deco] | h[]>coords[row heights,r[]];
 
 	    contents[] = text row( contents[], t[], coords[col widths,x[]] );
 
-	    print( select if (highlight[], '&reverse on;', '' ), select if (oversize[], '&warning;', '' ), contents[], select if (oversize[], '&default;', '') , select if (highlight[], '&reverse off;', '' ), '&boxv;' );
+	    print( select if (highlight[], '&reverse on;', '' ), select if (oversize[], '&warning;', '' ), attr[], contents[], select if (coords[deco], '&default;', '') , select if (highlight[], '&reverse off;', '' ), '&boxv;' );
 
 	    xscr[] += coords[col widths,x[]] + 1;
 	    x[]++;
@@ -493,11 +502,11 @@ define procedure and function( table view, { { table, literal }, {prompt, litera
 	// Step 1 - Identify column widths for display purposes
 
 
-	structure( coords[], { offset row, offset col, current row, current col, min row, max row, min col, full col, max col, console width,  console height,  show row numbers, select headers, deco, do input, wrap,  alt screen, json },
-			     { 0,          0,          0,           0,           1,       4,       3,       30,       40,      console(width), console(height), true,             true,           true, true,     false, false,      false  } );
+	structure( coords[], { offset row, offset col, current row, current col, min row, max row, min col, full col, max col, console width,  console height,  show row numbers, select headers, deco, do input, wrap,  alt screen, json},
+			     { 0,          0,          0,           0,           1,       4,       3,       50,       60,      console(width), console(height), true,             true,           true, true,     false, false,      false  } );
 
 
-	if (!existing(options[])) options[] = {}; // Default: No options.
+	if (!existing here(options[])) options[] = {}; // Default: No options.
 	
 	if (variable view[]) // Function name 'variable view'
 	{
@@ -1004,14 +1013,14 @@ define procedure and function( table view, { { table, literal }, {prompt, litera
 
 	if (variable view[])
 	{
-	    if (existing(row[])) row[] = coords[row variable,coords[index table row,coords[current row]+coords[offset row]]];
-	    if (existing(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
+	    if (existing here(row[])) row[] = coords[row variable,coords[index table row,coords[current row]+coords[offset row]]];
+	    if (existing here(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
 	    table delete( table[] );
 	}
 	else // table view
 	{
-	    if (existing(row[])) row[] = coords[index table row,coords[current row]+coords[offset row]];
-	    if (existing(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
+	    if (existing here(row[])) row[] = coords[index table row,coords[current row]+coords[offset row]];
+	    if (existing here(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
 	}
 	echo;
 
@@ -1035,7 +1044,7 @@ define procedure( inspect, { { variable, all, reference }, { option, literal } }
 {
     local
     {
-	if (!existing(option[])) option[] = '';
+	if (!existing here(option[])) option[] = '';
 	if (option[]<>+json,'') { echo("Invalid option '", option[],"' will be ignored. Only valid option: 'json'."); sleep(1); }
 	variable view( variable[], "Press F1 key for help. Type 'Enter' whene done viewing.", new line, {wrap,alt screen,select no headers} + select if( (option[]=+json), {json},{})  );
     }
@@ -1183,7 +1192,7 @@ define procedure ( view, { { table name, literal }, { visualization tool, litera
 {
     local // Ensure all variables firstly assigned do not interfere with equally named global variables
     {
-	if (!existing(visualization tool[])) visualization tool[] = here;
+	if (!existing here(visualization tool[])) visualization tool[] = here;
 	browser[] = '';
 	datatables[] = false;
 
@@ -1463,6 +1472,180 @@ define procedure ( docs, {{ keyword, literal } }, 0, 1 )
 	runtime settings[verbose] = saved[];
     }
 }
+
+
+
+//
+// File Brower
+// _________________________________________________________________________________________________________
+//
+
+
+
+//	File browser function
+//	Prompt: If no new line, then it is prompt alone.  If 1 new line: Header + prompt.  
+//	
+//	path		Initial directory path, e.g. "." for current directory
+//	pattern		File input pattern, e.g. ".xlsx,*.xlsm"
+//	options		Browser specific options
+//		files only		Do not show directories, so browsing directories is suppressed
+//		colors 			Assign characteristic colors to commonly known files (e.g. office files)
+//		file names ignore case	Ignore case even in LINUX/MACOS systems
+//		Additional options as described in table view: alt screen, ignore case, no deco, no input, full row cursor
+
+
+
+define function(  file browser, { { prompt, literal }, { path, literal }, { pattern, literal }, { options, parameters }}, 0, 4 )
+{
+    local
+    {
+
+	table initialize( __ color table __, 
+	    {	{ Pattern, 			    Directory,	Type,			Color },
+		{ '*.xlsx,*.xlsm,*.xlsb,*.xls,*.xlst',  No,	"Spreadsheet",		green },
+		{ '*.docx,*.doc', 			No,	"Document",		light lapis, },
+		{ '*.txt,*.md', 			No,	"Text file",		white },
+		{ '*.csv,*.dat', 			No,	"Text based data",	granny },
+		{ '*.ppt,*.pptx', 			No,	"Presentation",		red },
+		{ '*.pdf', 				No,	"PDF File",		light pink },
+		{ '*.zip,*.7z,*.tar,*.gz,*.jar',	No,	"Compressed / Archive",	light tan },
+		{ '*.html,*.htm,*.css', 		No,	"Web data file",	cyan },
+		{ '*.json,*.xml',			No,	"Structured data file",	light violet },
+		{ '*.exe', 				No,	"Executable file",	gray },
+		{ '*.b4p', 				No,	"B4P program",		light blue },
+		{ '*.jpg,*.jpeg,*.gif,*.tif,*.tiff,*.png,*.bnp', No, "Image",		yellow },
+		{ '*.c,*.cpp,*.h,*.vba,*.py,*.asm,*.java,*.js', No, "Source code file",	ocean },
+		{ '*',					No,	"Other file type",	light gray },
+		{ '*',					Yes,	"Folder",		light orange }
+	    } );
+
+	// Define default parameters
+	
+	if (!existing here(prompt[]))	prompt[]	= 'Select file: ';		// Default: No options.
+	if (!existing here(path[]))	path[]		= '.';				// Default: Current path
+	if (!existing here(pattern[]))	pattern[]	= '*';				// Default: All files
+	if (!existing here(options[]))	options[]	= {};				// Default: No options.
+
+
+	// Identify the options
+
+	file names ignore case[] = system info[operating system] == Windows; // LINUX and LINUX are not case sensitive
+	opt[table] = { hide row numbers, select no headers, allow sorting, alt screen };
+	for all parameters( options[], option[] ) switch( option[] )
+	{
+	    case( files only)			opt[files only] = true;
+	    case( colors )			opt[colors]	= true;
+	    case( return path )			opt[return path] = true;
+	    case( file names ignore case )	file names ignore case[] = true;
+	    case( alt screen, ignore case, no deco, no input, full row cursor ) opt[table]	|= {option[]};
+
+	    else:			
+		exception( stop, compose("Function 'table view':", new line, "3nd parameter: options contains an invalid option: '", option[],"." ), 1);
+	}
+
+	// Memorize original path and set initial path.
+
+	if (!directory existing(path[]))
+	{
+	    exception( interactive, compose("Function 'file brower': Directory path '", path[], "' is invalid or does not exist.") , 1 );
+	}
+
+	path[original] 			= working directory();
+	working directory		( path[] );
+	path[] 				= working directory();
+
+	do
+	{
+	    continue[] 				= false;
+	    directory listing			( __ dir __ );
+
+	    if (pattern[] != '')
+	    {
+		if (file names ignore case[])
+		{
+	            table keep selected rows    ( __ dir __, ([Name]=+softquoted literal(pattern[])) | [Directory]==Yes ); // Note the plus sign
+		}
+		else
+		{
+	            table keep selected rows    ( __ dir __, ([Name]=softquoted literal(pattern[])) | [Directory]==Yes );
+		}
+	    }
+
+	    if (!existing here(opt[files only]))
+	    {
+		table insert rows		( __ dir __, 1 );
+		[ __ dir __:Name,1]		= ".." + system info[directory separator];
+	    }
+	    else
+	    {
+	        table delete selected rows    	( __ dir __, [Directory]==Yes );
+	    }
+
+	    table lookup smart ignore case	( __ dir __, {Name, Directory}, {Type,Color}, __ color table __, {Pattern, Directory}, {Type,Color} );
+	    if (existing here(opt[colors])) // Color the files
+	    {
+		table process selected rows	( __ dir __, [Color]!='', [Name] = decode entities( '&' + [Color] + ';' + [Name] ));
+		table process selected rows	( __ dir __, [Color]!='', [Type] = decode entities( '&' + [Color] + ';' + [Type] ));
+	    }
+	    table process			( __ dir __, [Date Updated] += ' ' + [Time Updated]; [Name] += ' '; [Type] += ' ';);
+	    table process			( __ dir __, 
+		switch( [Size] )
+		{
+		    case ('',0)		[Size] = '';
+		    case (<10000)	[Size] = literal([Size],'?,??0  ', local) + " bytes";
+		    case (<10000000)	[Size] = literal([Size]/1000,'?,??0.0', local) + " Kb";
+		    case (<10000000000)	[Size] = literal([Size]/1000000,'?,??0.0', local) + " Mb";
+		    else:		[Size] = literal([Size]/1000000000,'?,??0.0', local) + " Gb";
+		} );
+	    table delete columns		( __ dir __, { Time Updated, Directory, Color } );
+	    table rename headers		( __ dir __, Date Updated, Last Update );
+	    table keep columns			( __ dir __, { Name, Type, Size, Last Update } );
+
+
+	    prompt[headline] = '';
+	    prompt[command]  = '';
+	    if (existing here(prompt[]))
+	    {
+		if ( find(prompt[], new line ) >= 0)
+		{
+	            prompt[headline] = left(prompt[], new line);
+		    prompt[command]  = right(prompt[], new line);
+		}
+		else
+		{
+		    prompt[command] = prompt[];
+		}
+	    }
+	    if (prompt[command]=='') prompt[command] = "Select directory, push 'Enter', then select file, push 'Enter' again: ";
+	    prompt[use] = prompt[headline] + path[] + new line + prompt[command];
+
+
+	    cmd[] = table view( __ dir __, prompt[use], new line + escape, opt[table], row[] );
+	    if (cmd[] == escape)
+	    {
+		echo(new line, "Pressed escape key. B4P will stop program execution", new line);
+		exit;
+	    }
+
+	    file name[] = [ __ dir __ : Name, row[] ]{0..-2};
+	    if (file name[]{0} > '&#x100000;') file name[] = file name[]{1..-1};
+
+	    if (cmd[]==new line & ( right(file name[],1) = system info[directory separator] ) )
+	    {
+		working directory( file name[] );
+		path[] = working directory();
+		continue[]= true;
+	    }
+	} while (continue[]);
+
+	working directory( path[original] );
+    }
+    if (!existing here(opt[files only])) file name[] = path[] + system info[directory separator] + file name[];
+
+    table delete( __ dir __, __ color table __ );
+    return( file name[] );
+}
+
 
 
 
