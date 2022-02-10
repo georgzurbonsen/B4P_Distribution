@@ -9,6 +9,13 @@ A language and engine for processing tabular data
 4. In the terminal, change directory to 'b4p_installation'
 5. Type './setup' to launch setup program
 
+### Script
+```text
+wget https://github.com/georgzurbonsen/Beyond4P_Distribution/blob/master/current/b4p-installation-linux-64bit.tar.gz
+tar -xvzf b4p-installation-linux-64bit.tar.gz
+cd b4p_installation/
+sudo ./setup --choice=machine --locale=en_US
+```
 
 ### Windows Supporting Applications
 1. Terminal:  https://cmder.net/
