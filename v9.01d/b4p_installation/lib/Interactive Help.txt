@@ -1,0 +1,217 @@
+Contents
+
+	Important info when updating this file:
+	1.  Each section must begin with the correponding digit followed by space or tab
+	2.  You are allowed to use tabs in this file.
+	3.  All other rows (like these ones) are ignored.
+
+
+0	
+0	
+0	0.  Help: Table of Contents
+0	_______________________________________________________________________________
+0
+0	Page Number
+0
+0	[1]   Access Online B4P Documentation
+0
+0	[2]   Access Local B4P Documentation and Function Descriptions
+0
+0	[3]   Interactive Statements, Expressions and Calculations
+0
+0	[4]   Inspecting Tables
+0
+0	[5]   Inspecting Variables
+0
+0	[6]   Basic Commands
+0
+0	[7]   Operating System Commands
+0
+0
+0	For more information, type:     docs search ( interactive mode )
+0	                                docs search (help)
+
+
+
+1	
+1	
+1	1. Access Online B4P Documentation
+1	_______________________________________________________________________________
+1	
+1	Following commands access help and info from www.b4p.app :
+1
+1	help                            Display this interactive help information
+1
+1	help welcome                    Welcome page (www.b4p.app)
+1	help user guide                 User Guide
+1	help language                   Languuage Guide
+1	help functions, help library    Function Library
+1	help index, help keywords       Index of all keywords
+1
+1	docs                            Welcome page (like 'help welcome')
+1	docs ( for )                    Search for specific keyword 'for'
+1	                                and access online documentation directly
+1	docs ( 'for*' )                 Search for or keywords starting with 'for'
+1	                                and then choose the docs to read.
+1	docs ('*')                      Search for all keywords, then select to open
+1
+1       browser (set)                   Select a different browser for web access
+1
+
+
+2
+2	
+2	2. Access Local B4P Documentation and Function Descriptions
+2	_______________________________________________________________________________
+2
+2	list functions                  Lists all procedures and functions
+2	list functions ( '*if*' )       Lists all functions containing 'if'
+2
+2	explain functions               Lists all procedures and functions
+2	explain functioos ( 'c*')       Explain all of functions starting with 'c'
+2	explain functions ( for )       Explain the 'for' procedure
+2
+2	dump functions( [table name] )  Dumps all functions with details in a table
+2	                                
+2
+2
+2
+2
+2
+2
+2
+2
+2
+2
+
+
+3	
+3	
+3	3. Interactive Statements, Expressions and Calculations
+3	_______________________________________________________________________________
+3
+3	Execute B4P statements:
+3	    Note: Use semicolons to separate multiple statements within a single line. 
+3	    Examples:
+3	        table load( my table name, test.csv )
+3	        a[] = 2 * 3
+3	        echo( Hello world ); echo( " It's ", date(now) )
+3	        a[]++
+3	
+3	Calculate B4P expressions: 
+3	    Note: Always begin with an equal sign '='.
+3	    Examples:
+3	        = average( 1, 2, 3, 4 )
+3	        = a[] + b[] + 1
+3	        = [my table name : Name , 5]
+3	        = table length( my table name )
+3	
+3	
+3	For more information, type:     docs search (interactive statements)
+3	                                docs search (interactive expressions)
+
+
+
+
+4	
+4	
+4	4. Inspecting Tables
+4	_______________________________________________________________________________
+4	
+4	list tables                        Lists names of all tables loaded or created
+4
+4	table list ( [mytable] )           Outputs contents of 'mytable' to the console
+4
+4	view ( [mytable] )                 View 'mytable' in remembered browser
+4	view ( [mytable], [tool] )         View 'mytable' in a specified browser
+4
+4	Examples:
+4	    view ( mytable )               View interactively on the console
+4	    view ( mytable, xlsx )         On Excel (.xlsx format)
+4	    view ( mytable, browser )      On web browser (plain HTML)
+4	    view ( mytable, datatables )   On web browser (with datatables navigator)
+4	    view ( mytable, csv )          On Excel (.csv format)
+4	
+4	view reset                         Deletes cached browser content (temp. files)
+4	
+4	For more information, type:        docs (view)
+4	                                   docs search (table list)
+4
+
+
+5	
+5
+5	5. Inspecting Variables
+5	_______________________________________________________________________________
+5	
+5	list variables                  List all variables with all contents
+5	list system variables           List all system variables ...
+5	list global variables           List all global variables ...
+5	list local variables            List all local variables ...
+5	
+5	list variables ( 'v*' )         List all variables beginning with 'v'.
+5	list local variables ('*a*')    List all local variables containing 'a'
+5	
+5	inspect( [variable name] )      Inspect contents of variabe. Example:
+5	inspect( a[] )                  Inspect all variable members 
+5	                                
+5       see ( a[] )                     Outputs all variable contents in simple way
+5
+5	= [variable name]               Display the value of a variable. Examples:
+5	                                 = a[]       display variable
+5	                                 = a[1]      display first element of variable
+5	
+5	For more information, type:     docs search (list variables)
+5	                                docs search (inspect)
+
+
+6	
+6	
+6	6. Basic Commands
+6	_______________________________________________________________________________
+6
+6	start ( Hello_World.b4p )       Start a B4P program like in this example
+6
+6	return                          Return and continue program execution
+6	                                (if stopped with the 'interactive' statement)
+6	
+6	exit                            Exit B4P (also CTRL+C exits B4P immediately)
+6
+6	prompt ( "..." )                Change the command prompt
+6
+6
+6	Examples:                       prompt( "working directory()" )
+6	                                prompt( "system info[user name])
+6	
+6	
+6	
+6	For more information, type:     docs search (basic commands)
+6	                                docs search (start)
+6	                                docs search (prompt)
+6	                                docs search (return)
+
+
+7	
+7	
+7	7. Operating System Commands
+7	_______________________________________________________________________________
+7
+7	To execute operating system commands from within B4P, 
+7	type '$' then the operating system command. Examples:
+7
+7	Windows:                             Linux / MacOS
+7	    $ dir                                $ ls
+7	    $ cd                                 $ pwd
+7	    $ cd subirectory_name                $ cd subdirectory_name
+7	    $ start abc.pdf                      $ open abc.def
+7
+7	    system ( dir )                       system ( ls )
+7
+7	The 'system' function also works in B4P programs, but '$' only interactively.
+7
+7	B4P recognizes '$ cd ...', '$ chdir ...' '$ D:\', etc. and ensures that the
+7	working directory inside B4P run time machine will also change.
+7
+7	
+7	For more information, type:     docs search (os commands)
+7	                                docs search (system)
