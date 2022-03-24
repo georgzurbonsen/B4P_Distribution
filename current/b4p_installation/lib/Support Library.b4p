@@ -1,0 +1,1746 @@
+
+/*
+	Support Library.b4p
+	____________________________________________________________________________________________________________
+
+
+	A collection of useful functions
+
+	____________________________________________________________________________________________________________
+
+
+	Author:			Georg zur Bonsen
+				Copyright (C) 2022 by Georg zur Bonsen, All Rights Reserved
+
+	Contents:
+
+	If you want to use this library, then you need to specify following function call:   include ( Support Libary )
+	If the library is not in the same directory, then specfiy an appropriate directory path.
+
+
+	Revision History:
+	____________________________________________________________________________________________________________
+
+	Library	B4P		Date		Features
+
+	1.00	7.00		28.02.2020	First release: List tables, view tables with broser
+	1.10	7.01		24.07.2019	Misc. updates
+	1.11	7.01		07.08.2019	Added 'table list', a very simple output function to list / dump small tables
+	2.00	8.00		08.08.2020	Transition to B4P
+	2.01	8.00		2020-08-31	Improved 'table list' to support data entries with line breaks inside
+	2.02	8.00		2020-09-17	Improved 'table list' to support partial table listing
+	2.03	8.00		2020-10-03	Bugfix in 'web docs', and supports Miccrosoft edge
+	2.04	8.00		2020-11-08	changed 'web docs' to 'docs search' and 'docs' opens online manual
+	2.05	8.00		2020-11-13	Version info moved to system variable
+	2.06	8.00		2021-01-03	Cleanup
+	2.07	8.00		2021-03-03	Hardened all functions against collisions with equally named global variables
+	2.10	8.00		2021-05-15	Additional help commands, openweb
+	2.11	8.00		2021-05-22	Bugfix and cleanup in 'table list'
+	2.12	8.00		2021-05-22	Help and other interactive support: clear screen is on by default
+	3.00	9.00		2022-01-03	General overhaul
+	3.01	9.00		2022-01-05	Bugfixes
+	3.02	9.00		2022-01-09	Use official HTML entity names for box drawing 
+	3.03	9.01		2022-01-29	Added file browser
+	3.04	9.01		2022-01-30	Bugfix
+	3.10	9.01a		2022-02-13	Added 'dir', some cleanups
+	3.11	9.01a		2022-02-15	Validated 'dir', and 'openweb' supports default browser.
+	3.12	9.01a		2022-02-16	bugfix
+	4.00	10.00		2022-03-15	literal -> string, etc.
+
+*/
+
+once
+{
+
+	//
+	// Version verification
+	// _________________________________________________________________________________________________________
+	//
+
+	libraries[support library,version info] = "4.00";
+	if (runtime settings[verbose] != quiet) echo("Included: ", "Support Library", "  ", libraries[support library,version info] );
+
+	if (num( left( version info[], ' ')) < 10.00)
+	{
+	    echo("Version Mismatch. Prerequisite for using this file 'Support Library.b4p' is B4P Release 10.00 or newer");
+	    echo("Please obtain and install latest available release.");
+	    stop;
+	}
+	
+	include( Utility Library ); // If not done so
+
+
+
+	//
+	// Additional System Variables
+	// _________________________________________________________________________________________________________
+	//
+
+	// Supported web browsers
+
+	libraries[support library,supported browsers,Windows] = { default, edge,  chrome, explorer , firefox };
+	libraries[support library,supported browsers,Linux]   = { default, brave, chrome, firefox  };
+	libraries[support library,supported browsers,MACOS]   = { default, brave, chrome, firefox, safari  };
+
+	libraries[support library,supported browsers,Windows, full name]   = { Operating system default, Microsoft Edge,      Google Chrome, Microsoft Explorer, Mozilla Firefox };
+	libraries[support library,supported browsers,Linux,   full name]   = { Operating system default,               Brave, Google Chrome, Mozilla Firefox  };
+	libraries[support library,supported browsers,MACOS,   full name]   = { Operating system default, Apple Safari, Brave, Google Chrome, Mozilla Firefox  };
+
+	libraries[support library,supported browsers,Windows,start] = { "start ", "start msedge ", "start chrome -a ", "start iexplore ", "start firefox "  };
+	libraries[support library,supported browsers,Linux,start]   = { "xdg-open ", "brave ",        "google-chrome ",   "firefox "  };
+	libraries[support library,supported browsers,MACOS,start]   = { "open ", 
+									'/usr/bin/open -a "/Applications/Safari.app" ',
+									'/usr/bin/open -a "/Applications/Brave Browser.app" ',
+									'/usr/bin/open -a "/Applications/Google Chrome.app" ',
+									'/usr/bin/open -a firefox -g ' };
+
+
+
+
+    //
+    // browser (...) - Get info about the browser or select one
+    // _________________________________________________________________________________________________________
+    //
+	
+
+
+
+define procedure and function ( browser, { { option, string } }, 0, 1 )
+{
+    local
+    {
+	new browser info[] = new line + 'Info: Type &high;browser(set)&previous; to assign a new web browser if needed.' + new line;
+	if (!existing here(option[])) option[] = get;  if (option[]='') option[] = get;
+
+	if (option[]=reset)
+	{
+	    attribute delete( system info[user app data directory b4p], "B4P User Settings.json", "Browser" ); // Memorize it
+	    echo('The memorized web browser name has been removed.', new browser info[]);
+	    return ("default");
+	}
+
+	supported browsers[] 		= libraries[support library,supported browsers,system info[ operating system ]];
+	supported browsers full name[]	= libraries[support library,supported browsers,system info[ operating system ], full name];
+
+	if ( find(supported browsers[], option[]) >= 0) // Specified browser is exsting and will be activated
+	{
+	    attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Browser", option[] ); // Memorize it
+	    echo("Successfully identified the web browser name provided: " ,supported browsers full name[]{find( supported browsers[], option[] )}, " (", option[], ").", new browser info[] );
+	    return( option[] );
+	}
+
+	if (option[]=info)
+	{
+	    attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Browser", chosen browser[] );
+	    if (chosen browser[]='')
+	    {
+		echo("No web browser has been chosen yet.  The default browser as configured in the OS will be used");
+		chosen browser[] = default;
+	    }
+	    else
+	    {
+		echo("The chosen browser, running under ", system info[operating system], " is ",
+		supported browsers full name[]{find( supported browsers[], chosen browser[] )}, " (", chosen browser[], ").", new browser info[] );
+	    }
+	    return( chosen browser[] );
+	}
+
+	if (option[]=get)
+	{
+	    attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Browser", chosen browser[] );
+	    if (chosen browser[]='')
+	    {
+		chosen browser[] = default;
+	    }
+	    return( chosen browser[] );
+	}
+
+	if (option[]<>set)
+	{
+	    echo("Attention - The specified web browser '", option[], "' does not exist or is not supported under ", system info[operating system], ".");
+	}
+
+	echo("Select a new browser.", new line);
+	table initialize( __ browsers __, {{ Symbol, Browser, Selection }} );
+	for all parameters( supported browsers[], browser[], index[] ) with table( __ browsers __, index[]+1 )
+	{
+		[Symbol]	= index[]+1;
+		[Browser]	= supported browsers full name[]{index[]};
+		[Selection]	= supported browsers[]{index[]};
+	}
+	chosen browser[] = table menu quick( __ browsers __, Symbol, Browser, Selection );
+	attribute write( system info[user app data directory b4p], "B4P User Settings.json", "Browser", chosen browser[] ); // Memorize it
+	echo("The browser name just selected will be used: '" , chosen browser[],"'.", new browser info[]);
+	return( chosen browser[] );
+    }
+}
+
+
+//
+// table list (...) - simple listing feature to standard output
+// _________________________________________________________________________________________________________
+//
+	
+
+define procedure( table list, {{ table name, string }, { option, string }, { value, numeral } }, 1, -1, 2 )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	if (table existing(table name[]) == false) exception( interactive, compose("Function 'table list': Table '", table name[], "' does not exist.") , 1 );
+
+	len[]		= table length( table name[] );
+	wid[]		= table max width( table name[] );
+
+	if (len[] = 0)
+	{
+	    if (runtime settings[verbose] != quiet) echo(new line, "    Function 'table list': Table '", table name[],"' is empty.", new line);
+	    return;
+	}
+
+	1st  row[]	= 1;
+	last row[]	= len[] - 1;
+	1st  col[]	= 0;
+	last col[]	= wid[] - 1;
+
+	briefly[]	= -1;
+	pause  1st row[]= len[];
+	pause last row[]= -1;
+
+	// Check for valid options
+
+	for ( i[] = 2, i[] < parameter count[], i[]+=2 )
+	{
+	    opt[] = pick if (i[]==2, option[], ('parameter '+str(i[]  ))[] );
+	    val[] = pick if (i[]==2, value [], ('parameter '+str(i[]+1))[] );
+
+	    switch( opt[] )
+	    {
+		case (1st row, last row)
+		{
+		    if (val[] < 0) val[] += len[];
+		    if (val[] <=0) val[] = 1;
+		    if (val[] >= len[]) val[] = len[]-1;
+		    (opt[])[] = val[];
+		}
+		case (1st col, last col)
+		{
+		    if (val[] < 0) val[] += wid[];
+		    if (val[] < 0) val[] = 0;
+		    if (val[] >= wid[]) val[] = wid[]-1;
+		    (opt[])[] = val[];
+		}
+		case (briefly)
+		{
+		    briefly[] = max 123( val[], 0);
+		}
+	        else: exception( interactive, compose("Function 'table list':, parameter ", i[]," (option) = '", opt[],"' is not a valid option") , 1 );
+	    }
+	}
+
+	if (briefly[] >= 0)
+	{
+		pause 1st  row[] = 1st  row[] + briefly[]; // 1st row to pause
+		pause last row[] = last row[] - briefly[];
+		if (pause last row[] <= pause 1st row[]) // Reset again
+		{
+		    pause  1st row[] = len[]; 
+		    pause last row[] = -1;
+		}
+	}
+
+	// Step 1: Identify the maximum lengths of each column
+
+	dim( char counts[], wid[], 0 );
+
+	for (x[] = 0, x[] < wid[], x[]++ )
+	{
+		for (y[] = 0, y[] <= last row[], y[]++)
+		{
+		    if ((y[] >= 1st row[]) | (y[] == 0))
+		        if ((y[] < pause 1st row[]) | (y[] > pause last row[])) with table( table name[], y[] )
+		        {
+			    substrings[] = tokenize( str([x[]]), include blanks, {new line} );
+			    for all parameters( substrings[], substring[] ) 
+			        char counts[x[]] = max( char counts[x[]], substring[]{} );
+		        }
+		}
+	}
+
+	// Step 2: List the table
+
+
+	for (y[] = 0, y[] <= last row[], y[]++) with table ( table name[], y[] )
+	{
+		addtl line[] = false;
+
+		if ((y[] > 0) & (y[] < 1st row[])) continue;
+
+		if ((y[] >= pause 1st row[]) & (y[] <= pause last row[])) 
+		{
+			echo("  ... :");
+			y[] = pause last row[];
+			continue;
+		}
+
+		row contents[]	= deep( str, {[..wid[]-1]} ); // Always full width
+		row height  []	= max( deep( height, {row contents[]} ) );
+
+		for( h[] = 0, h[] < row height[], h[]++ )
+		{
+		    print( select if( h[] == 0, str( y[], "????0 :" ), '      :' ) );
+
+		    for (x[] = 1st col[], x[] <= last col[], x[]++ )
+		    {
+			st[] = row contents[]{ x[] };
+			nl[] = find   ( st[], new line );
+			if (nl[]>=0) // Found a new line
+			{
+			    row contents[]{ x[] }	= right( st[], new line );
+			    st[]			= left ( st[], new line );
+			}
+			else	
+			{
+			    row contents[]{ x[] }	= '';
+			}
+
+			print( " ", str( st[], str(char counts[x[]]) + "#" ) );
+			if (x[] < last col[]) print( " |" );
+		    }
+		    echo; // Next line
+		}
+	}
+	echo; // Concluding with blank line at the end
+    }
+}
+
+
+    //
+    // List B4P Tables
+    // _________________________________________________________________________________________________________
+    //
+
+
+define procedure( __ internal table display row __, { { table, string }, { coords, all, reference } } )
+{
+  local
+  {
+    cursor( 1, coords[screen row] );
+
+    if (coords[row]>=member count( coords[index text row] )) // Keep rows blow table end blank
+    {
+	clear(right);
+	continue;
+    }
+
+
+    r[] = coords[index table row,coords[row]]; // Table row
+    t[] = coords[index text  row,coords[row]]; // Text row
+    p[] = coords[index table row,coords[current row]+coords[offset row]]; // Current row pointed
+
+//    beyond end of table[] = 
+
+
+    with table( table[], r[] )
+    {
+	if (coords[show row numbers])
+	    print ( select if( t[]>0, '       &boxv;', str( r[], '?????0 &boxv;' ) ) );
+
+	x[] = coords[offset col];
+	xscr[] = 9; // First 9 columns taken for row numbering done before
+
+	coords[cols displayed] = 0;
+
+        if (coords[deco]) print( select if (coords[row]<coords[row heights,0], '&DECO 4;', select if( even(r[]), '&DECO 1;', '&DECO 2;' )) );
+
+	while( x[] < member count( coords[col widths] ))
+	{
+	    if ((xscr[] + coords[col widths,x[]] + 1) > coords[console width]) break loop;
+	    coords[cols displayed]++;
+
+	    highlight[] =  r[]==p[] & (x[]==(coords[current col]+coords[offset col]) | coords[current col] < 0) & coords[do input];
+
+	    contents[] = str([x[]]);  // Pick up from table
+	    attr[]='';
+	    if (contents[]{0} >= '&#x100000;')
+	    {
+		attr[] = contents[]{0};
+		contents[] = contents[]{1..-1};
+	    }
+
+	    if (coords[wrap] & coords[col widths,x[]]>1) contents[] = format( { right margin, coords[col widths,x[]], as text, true }, contents[] );
+	    h[] = height( contents[] );
+	    oversize[] = width(contents[])>coords[col widths,x[]] & coords[deco] | h[]>coords[row heights,r[]];
+
+	    contents[] = text row( contents[], t[], coords[col widths,x[]] );
+
+	    print( select if (highlight[], '&reverse on;', '' ), select if (oversize[], '&warning;', '' ), attr[], contents[], select if (coords[deco], '&default;', '') , select if (highlight[], '&reverse off;', '' ), '&boxv;' );
+
+	    xscr[] += coords[col widths,x[]] + 1;
+	    x[]++;
+	}
+    }
+
+    if ( coords[current col] >= coords[cols displayed] ) // Contain the cursor so it will not scroll beyond right side of screen
+    {
+	coords[current col] = coords[cols displayed] - 1;
+    }
+
+    print( '&DEFAULT; ');
+    clear(right);
+
+  } // local
+}
+
+
+
+define procedure( __ tabulate variable __,  { { variable, all, reference }, { table, string }, { coords, all, reference }, { hierarchy, parameters }, { action, string } } )
+{
+    local
+    {
+	// Following entries in coords[] are used
+	//
+	//	coords[depth]			Initial visualization depth
+	//	coords[row variable]		Variable member name specified in a parameter set
+	//	coords[row tabulated]		Working row in table to tabulate
+
+	//  Actions:
+	//
+	//	init				Initialize the table with specific depth
+	//	expand				At the selected row, expand
+	//	contract			At the selected row, contract
+	//	expand all			At the selected row, expand all
+
+
+	rows to insert[] = 0;
+
+	check( action[] )
+	{
+	    case (init)
+	    {
+		coords[row tabulated]=1;
+	    }
+	    case (continue)
+	    {
+		coords[row tabulated]++;
+	    }
+
+	    case (contract)
+	    {
+		coords[row tabulated]	= coords[index table row,coords[current row]+coords[offset row]];
+		hierarchy[]		= coords[row variable,coords[row tabulated]];
+		coords[depth]		= hierarchy[]{};
+		rows to delete[]	= 0;
+		for (i[] = coords[row tabulated]+1, i[]<table length(table[]) & [table[]:Level,i[]]>coords[depth], i[]++) rows to delete[]++;
+
+		table delete rows	( table[], coords[row tabulated]+1, rows to delete[] );
+		delete members		( coords[row variable], coords[row tabulated]+1, (coords[row tabulated]+1)+(rows to delete[]-1) );
+	    }
+
+	    case (expand)
+	    {
+		coords[row tabulated]	= coords[index table row,coords[current row]+coords[offset row]];
+		hierarchy[]		= coords[row variable,coords[row tabulated]];
+		rows to insert[]	= member count( variable[hierarchy[]] );
+		coords[depth]		= hierarchy[]{}+1;
+	    }
+
+	    case (expand all)
+	    {
+		coords[row tabulated]	= coords[index table row,coords[current row]+coords[offset row]];
+		hierarchy[]		= coords[row variable,coords[row tabulated]];
+		rows to insert[]	= weight( variable[hierarchy[]] )-1;
+		coords[depth]		= -1;
+	    }
+
+	    case (expand, expand all)
+	    {
+		cursor(1,25); clear(below); print("rows to insert[] = ", rows to insert[] );
+		table insert rows if needed ( table[], coords[row tabulated]+1, rows to insert[] );
+		insert members( coords[row variable], coords[row tabulated]+1, rows to insert[], 0 );
+	    }
+	}
+	
+	level[] = hierarchy[]{};
+
+
+	with table (table[], coords[row tabulated])
+	{
+		[Variable Name]		= str(pick if (hierarchy[]=={}, name( variable[]), hierarchy[]{-1} ) );
+
+		[Level]			= level[];
+		[Form]			= identify( variable[hierarchy[]] );
+		[Weight]		= weight( variable[hierarchy[]] );
+		[Contents]		= variable[hierarchy[]];
+		[Type]			= type(variable[hierarchy[]]);
+
+		[Variable Name]		= replicate('  ',level[]) + select if( [Weight]>1, select if( ( level[] < coords[depth] | coords[depth] < 0 ),'- ', '+ '), '  ') + str([Variable Name]);
+
+		if (coords[json])
+		{
+		    if ([Contents] == "# Invalid Value #") [Contents] = 'null';
+		    [Type] = select by value( [Type], string, string, numeral, number, [Type] );
+		    [Form] = select by value( [Form], structure, object, simple, [Type], [Form] );
+		}
+
+
+		coords[row variable,coords[row tabulated]]= hierarchy[];
+		if (action[]<>contract) if ( level[] < coords[depth] | coords[depth] < 0 ) // Full recursion if less than 0
+		{
+		    for all variables if existing( variable[hierarchy[]], value[], i[], name[] )
+		    {
+			__ tabulate variable __ ( variable[], table[], coords[], hierarchy[] + {select if( [Form]==array, i[], name[])}, continue  );
+		    }
+	        }
+	}
+
+    }
+}
+
+
+
+define procedure and function( table view, 
+	{ { table, string }, 
+	  { prompt, string}, 
+	  { return characters, string}, 
+	  { options, parameters }, 
+	  { row, all, output }, 
+	  { col, all, output }, 
+	  { callback function name, string }, 			// Optionally specify callback function
+	  { callback characters, string } }, 3, 8 )		// Specify characters which invoke callback function
+
+// Callback Function:
+// define procedure and function( function name, {{ table name, string }, { cmd, string}, { row, numeral }, { column, numeral }} )
+
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	if (!existing here( callback function name[] ))		callback function name[] = '';
+	if (!existing here( callback characters[] ))		callback characters[] = '';
+
+
+	variable view[] = function name[] = 'variable view';
+
+	// Step 1 - Identify column widths for display purposes
+
+
+	structure( coords[], { offset row, offset col, current row, current col, min row, max row, min col, full col, max col, console width,  console height,  show row numbers, select headers, deco, do input, wrap,  alt screen, json},
+			     { 0,          0,          0,           0,           1,       4,       3,       50,       60,      console(width), console(height), true,             true,           true, true,     false, false,      false  } );
+
+
+	if (!existing here(options[])) options[] = {}; // Default: No options.
+	
+	if (variable view[]) // Function name 'variable view'
+	{
+	    table[] = "__ variable table view __";
+	    table initialize( table[], {{ Variable Name, Contents, Type, Form, Level, Weight }} );
+	    coords[depth] = 1;
+	    options[] |= { select no headers };
+	}
+	else // Function name 'table view'
+	{
+	    if ( table existing( table[] ) = false)
+	    {
+		echo("Specified table '", table [], "' does not exist. ");
+		return;
+	    }
+
+	    if ( table length( table[] ) = 0 )
+	    {
+		echo("Specified table '", table [], "' is empty. Nothing to list. ");
+		return;
+	    }
+	}
+
+	column count[] = table max width( table[] );
+
+
+	// coords[] - Explanation
+
+	//	coords[offset row]		Screen offset to top of table.  0 = Start with row 0
+	//	coords[current row]		Field cursor position to current row related to screen.  Point to index with sum of ...[offset row] and ...[current row]
+	//	coords[offset col]		Screen offset to left of table.  0 = Start with column 0
+	//	coords[current col]		Field cursor position to current column related to screen.  Point to index with sum of ...[offset col] and ...[current col]
+
+	//	coords[min row], [max row]	Rules minimum and maximum number of screen rows to show per table row
+	//	coords[min col], [max col]	Rules minimum and maximum number of screen columns to show per table column
+	//	coords[full col]		Table with max [full col] number of characters in that column shall not be truncated
+	//	coords[console width]		Full console width
+	//	coords[console height]		Full console height
+	//	coords[rows displayed]		Typically 8 less than number of rows.
+	//	coords[cols displayed]		10 less than number of columns in order to fit line number of the left and keep last column column blank
+
+	//	coords[show row umbers]		Boolean flag indicating row numbers to be displayed
+	//	coords[select headers]		Boolean flag allowing to select filds in the header row
+	//	coords[deco]			Boolean flag to provide background deco color (zebra pattern) and highlight truncated contents in a different color
+	//	coords[do input]		Allow interactive input to navigate through the table and return command keys pressed
+	//	coords[wrap]			Enable wrap-around (word-wise if possible)
+	//	coords[alt screen]		Use alternative screen, return to main screen buffer when done
+
+	//	coords[col widths]		Active column widths across the table
+	//	coords[row heights]		Active row heights across the table
+
+	//	coords[row]			Index row number to show on the screen
+	//	coords[screen row]		Screen row number, which is actual cursor position on the screen
+
+	//	coords[depth]			'variable view' only: Initial depth (number of levels) to display at the beginning. Below 0 = Display all
+	//	coords[row variable]		Corresponding variable member name for row displayed
+	//	coords[row tabulated]		Used in '__ tabulate variable __' as index when expanding contents recursively
+
+
+	//	Ensure window size is sufficiently big
+
+	while ( coords[console width] < coords[max col] + 15 | coords[console height] < coords[max row] + 15 )
+	{
+		echo(new line, "Console window size (", coords[console height], " rows, ", coords[console width], " columns) is too small.");
+		echo("Increase the size to at least (", coords[max row] + 15, " rows, ", coords[max col] + 15, " columns),", new line, "then hit any key to continue.");
+		getch;
+		coords[console width] = console(width);
+		coords[console height] = console(height);
+		echo;
+	}
+	coords[rows displayed] = coords[console height]-7; // Take into account some space for bottom part (menu, help, etc.)
+	coords[columns displayed] = coords[console width]-10;  // Take into account space for row numbers
+
+
+	ignore case[] = false;
+	allow sorting[] = false;
+	for all parameters( options[], option[] ) switch( option[] )
+	{
+	    case (full row cursor)	coords[current col] = -1;
+	    case (hide row numbers)	coords[show row numbers] = false;
+	    case (select no headers)	coords[select headers] = false;
+	    case (ignore case)		ignore case[] = true;
+	    case (no deco)		coords[deco] = false;
+	    case (no input)		coords[do input] = false;
+	    case (wrap)			coords[wrap] = true;
+	    case (alt screen)		coords[alt screen] = true;
+	    case (json)			coords[json] = true;
+	    case (allow sorting)	if (!variable view[]) allow sorting[] = true;
+	    else:			
+		exception( stop, compose("Function 'table view':", new line, "3nd parameter: options contains an invalid option: '", option[],"." ), 1);
+
+	}
+	if (ignore case[]) return characters[] = +return characters[]; // Upper case
+
+	if (find(prompt[],new line)>0)
+	{
+	    title[]  = left (prompt[], new line);
+	    prompt[] = right(prompt[], new line);
+	}
+	else
+	{
+	    if (variable view[])
+	    {
+		title[] = "Viewing variable: " + name( variable[] );
+	    }
+	    else // table view
+	    {
+		title[] = "Viewing table: " + table[];
+	    }
+	}
+
+	if (variable view[])
+	{
+		__ tabulate variable __( variable[], table[], coords[], {}, init );
+	}
+
+	display[] = {all}; // All
+	recalculate row index[] = true;
+	redim table[] = true;
+	clear below[] = true;
+
+	if (coords[alt screen]) clear( select if (coords[alt screen], alt, all below ) );
+	echo(title[]);
+	do
+	{
+		if (redim table[])
+		{
+
+		    // Identify the number of rows and their heights in every table and generate an index table for displaying
+
+		    dim( coords[row heights], table length( table[] ), 1 );
+		    table process all rows( table[],
+		    {
+			height[] = max 123( deep( height, {[..]} ) );
+			coords[row heights,row()] = min 123( max 123( height[], coords[min row] ), coords[max row] );
+		    } );
+
+
+
+		    // Identify the number and widths of all columns
+
+		    if (!existing(coords[col widths])) dim( coords[col widths], column count[], 1 );
+
+		    cmax[] = table max width( table[] );
+		    for (c[] = 0, c[] < cmax[], c[] ++) with table( table[], 0, c[] )
+		    {
+			vector[] = deep( width, {[.,] } );
+			max[] = max 123( vector[] );						// Maximum width
+			wid[] = round(max 123( quantile( 0.9, vector[] )*1.1),  coords[min col] );		// 80% of all columns to fit in, but above minimum
+			if ( wid[] < coords[full col]) wid[] = max[];				// If width is below size for shoing all columns, then show all
+			wid[] = max 123( wid[], width( [.] ) );					// Increase width to fit entire header
+			coords[col widths,col()] = max 123( coords[col widths,col()], min 123( wid[], coords[max col] ));		// Limit to max col.
+		    }
+		    redim table[] = false;
+		}
+
+
+		if (recalculate row index[])
+		{
+		    delete( coords[index table row], coords[index text row] );
+		    i[] = 0;
+		    table process all rows ( table[],
+		    {
+			for (j[] = 0, j[] < coords[row heights,row()], j[]++) 
+			{
+			    coords[index table row, i[]   ] = row();
+			    coords[index text row , i[]++ ] = j[];
+			}
+		    } );
+		    recalculate row index[] = false;
+		}
+		len[] = member count( coords[index text row] );
+
+
+		if (!coords[select headers] & table length( table[] ) > 1 ) // In case selecting header row is forbidden
+		{
+		    if (coords[current row]+coords[offset row]==0) coords[current row] = coords[row heights,0];
+		}
+
+
+		if (display[]=={all} | find(display[],0)>=0)
+		for (y[] = 0, y[] < coords[row heights,0], y[]++) // Display the header row
+		{
+		    coords[row] = y[];
+		    coords[screen row] = y[]+2; // Keep top row blank for header
+		    __ internal table display row __ ( table[], coords[] );
+		}
+
+		for (y[] = coords[row heights,0], y[] < coords[rows displayed], y[]++)
+		{
+		    coords[row] = y[] + coords[offset row];
+		    coords[screen row] = y[]+2; // Keep top row blank for header
+
+		    if (display[]=={all} | find(display[], y[])>=0 )
+		        __ internal table display row __ ( table[], coords[] );
+		}
+
+		cursor(1, min(coords[rows displayed],member count( coords[index text row] )) + 2);
+		if (clear below[])
+		{
+		    clear(right);
+		    print(new line, prompt[]);
+		    clear( right below );
+		}
+		else
+		{
+		    print(new line, prompt[]);
+		    clear( right );
+		    clear below[] = true;
+		}
+
+		cmd[]= '';
+		display[] = {};
+
+		if (coords[do input])
+		{
+		    cmd[] = getch();
+		    if (ignore case[]) cmd[] = +cmd[];
+		}
+
+		c[] = max 123(0,coords[current col])+coords[offset col];  	// Current column
+		y[] = coords[current row]+coords[offset row];			// Current index row
+		r[] = coords[index table row,y[]];				// Current table row
+	
+		
+		if ((coords[do input]) & find(callback characters[], cmd[] )>= 0)
+		{
+		    call( callback function name[], { table[], cmd[], r[], c[] } );
+		}
+
+
+		if (coords[do input]) check( cmd[] )
+		{
+
+		    case( '+','>' ) 
+		    {
+			if (!variable view[]) break; // For viewing variables only.
+
+			if ( trim(str([table[]:Variable Name,r[]]))='+ *' ) 
+			{
+			    __ tabulate variable __ ( variable[], table[], coords[], {}, select if( cmd[]=='+', expand, expand all ) );
+			}
+		    }
+
+		    case( '-' ) 
+		    {
+			if (!variable view[]) break; // For viewing variables only.
+
+			if ( trim(str([table[]:Variable Name,r[]]))='- *' ) 
+			{
+			    __ tabulate variable __ ( variable[], table[], coords[], {}, contract );
+			}
+		    }
+
+		    case ( '-','+','>' )
+		    {
+			recalculate row index[]		= true;
+			redim table[] 			= true;
+			display[] 			= {all};
+		    }
+
+		    case ('&f1;')
+		    {
+			echo;
+			clear(right below);
+			echo('Navigation:                 &larr; &rarr; &uarr; &darr;, home, ctrl-home, end, ctrl-end, pg up, pg dn');
+			echo("Change widths, heights:     ctrl- &larr; ctrl- &rarr; ctrl- &uarr; ctrl- &darr;");
+			echo("Copy field to clipboard:    ctrl-c (press once only)");
+			if (variable view[])		  print("Inspect member variables:   + (expand), > (expand all), - (contract), f3 (info)");
+			if (allow sorting[])		  print("Sorting:                    Select column, then press f4");
+			clear below[] = false;
+		    }
+
+		    case ('&f3;')
+		    {
+			if (variable view[])
+			{
+			    echo;
+			    clear(right below);
+			    echo("Variable name: ", name(variable[coords[row variable, r[]]]));
+			    echo("Tree   profile:  ", weight profile(variable[coords[row variable, r[]]]), "  Total weight: ", weight (variable[coords[row variable, r[]]]),
+				"   Depth: ",  depth (variable[coords[row variable, r[]]]) );
+			    echo("Leaves profile:  ", weight profile(variable[coords[row variable, r[]]], valid leaves), "  Total leaf count: ", weight (variable[coords[row variable, r[]]], valid leaves) );
+			    clear below[] = false;
+			}
+		    }
+
+		    case ('&f4;')
+		    {
+			if (allow sorting[])
+			{
+			    table sort rows( table[], c[] );
+			    redim table[]= true;
+			    recalculate row index[] = true;
+			    display[] = {all};
+			}
+		    }
+
+		    case ( '&ctrl-arrow-left;') // Make column narrower
+		    {
+			if (coords[col widths, c[] ] > 2) coords[col widths, c[] ]--;
+			display[] = {all};
+		    }
+
+		    case ( '&ctrl-arrow-right;') // Make column wider
+		    {
+			if (coords[col widths, c[] ] < coords[columns displayed]) coords[col widths, c[] ]++;
+			display[] = {all};
+		    }
+
+		    case ( '&ctrl-arrow-up;') // Display fewer rows for this table row
+		    {
+			if (coords[row heights,r[]] > 1 )
+			{
+			    coords[row heights,r[]]--;
+			    recalculate row index[] = true;
+			    display[] = {all};
+			}
+		    }
+
+		    case ( '&ctrl-arrow-down;') // Display more rows for this table row
+		    {
+			if (coords[row heights,r[]] < coords[rows displayed]-3-coords[row heights,0] ) // Minus header row
+			{
+			    coords[row heights,r[]]++;
+			    recalculate row index[] = true;
+			    display[] = {all};
+			}
+		    }
+
+		    case ( '&ctrl-c;') // Copy to clipboard
+		    {
+			clipboard( [table[]:c[],r[]] );
+		    }
+
+		    case ( '&home;' ) // Go to 1st column
+		    {
+			coords[offset col] = 0;
+			if (coords[current col] > 0) coords[current col] = 0; // Keep negative value because it marks entire row
+			display[] = {all};
+		    }
+
+		    case ( '&end;' ) // Go to last column
+		    {
+			if (coords[current col] > 0) coords[current col] = 0; // Keep negative value because it marks entire row
+			coords[offset col] = column count[]-1;
+			display[] = {all};
+		    }
+
+		    case ( '&arrow-left;') // One column to the left
+		    {
+			if (coords[current col]<0)
+			{
+			    if (coords[offset col] > 0) coords[offset col]--;
+			    display[] = {all};
+			    break;
+			}
+			display[] = { coords[current row] };
+			if (coords[current col] > 0)
+			{
+			    coords[current col]--;
+			}
+			else
+			{
+			    if (coords[offset col]> 0)
+			    {
+				coords[offset col]--;
+				display[] = {all};
+			    }
+			}
+		    }
+
+		    case ( '&arrow-right;') // One column to the right
+		    {
+			if (coords[current col]<0)
+			{
+			    if (coords[offset col] < column count[]-1) coords[offset col]++;
+			    display[] = {all};
+			    break;
+			}
+			display[] = { coords[current row] };
+			if (coords[current col] < coords[cols displayed]-1)
+			{
+			    coords[current col]++;
+			}
+			else
+			{
+			    if (coords[current col] + coords[offset col] < column count[]-1)
+			    {
+				coords[offset col]++;
+				display[] = {all};
+			    }
+			}
+		    }
+
+		    case ( '&arrow-left;', '&arrow-right;' ) // Marke following rows to be displayed, too.
+		    {
+			if (coords[current col]<0) break; // No action if entire row selected
+			if (display[] != {all})
+			{
+			    for ( i[] = coords[current row]+coords[offset row]+1, i[] < len[], i[] ++)
+			    {
+				if ( coords[index text  row,i[]] == 0) break;
+				display[] += { i[] - coords[offset row] };
+			    }
+			}
+		    }
+
+		    case ( '&ctrl-home;') // Move to top left, 1st row
+		    {
+			display[] = {all}; // All
+			coords[offset row] = 0;
+			coords[current row] = 0;
+		    }
+
+		    case ( '&ctrl-end;') // Move to last row
+		    {
+			display[] = {all}; // All
+			coords[current row] = coords[rows displayed]-1;
+			coords[offset  row] = len[]-1;
+			while ( coords[current row]+coords[offset row] > len[]-1 & coords[offset row]>0) { coords[offset row]--; }
+			while ( coords[current row]+coords[offset row] > len[]-1 & coords[current row]>0) { coords[current row]--; }
+			while ( coords[index text row,coords[current row]+coords[offset row]]>0 ) coords[current row]--;
+		    }
+
+
+		    case ( '&pgup;' ) // Page up
+		    {
+			display[] = {all}; // All
+			coords[offset row] = max(coords[offset row] - (coords[rows displayed] - coords[row heights,0]), 0);
+		    }
+
+		    case ( '&arrow-up;' ) // Move up
+		    {
+			for (i[] = coords[current row], i[] + coords[offset row] < len[], i[]++)
+			{
+			    if (i[] > coords[current row] & coords[index text row,i[]+coords[offset row]]==0) break; // Beyond end of current data row
+			    display[] += { i[] };
+			}
+
+			if (coords[current row]+coords[offset row] > 0) { display[] += { --coords[current row] }; } // Actual cursor movement.
+
+			while( coords[index text row,coords[current row]+coords[offset row]]>0)
+			{
+			    display[] += { --coords[current row] };  
+			}
+		    }
+
+		    case ( '&arrow-up;', '&pgup;' )
+		    {
+			while( coords[current row] < coords[row heights,0] & coords[offset row]> 0) // Top of screen below header row, scroll up till top reached, then touch header
+			{
+			    display[] = {all}; // All
+			    coords[current row]++;
+			    coords[offset  row]--;
+			}
+		    }
+
+		    case ( '&arrow-down;' ) // One row down
+		    {
+			if ( r[] >= table length(table[])-1 ) break; // Last row already reached.
+
+			display[] = { coords[current row] };
+			while ( coords[current row]+coords[offset row] < len[] )
+			{
+			    display[] += { ++coords[current row] };
+			    if (coords[current row]+coords[offset row] < len[] ) 
+			        if ( coords[index text  row,coords[current row]+coords[offset row]] == 0) break;
+			}
+			for ( i[] = coords[current row]+coords[offset row]+1, i[] < len[], i[] ++)
+			{
+			    if ( coords[index text  row,i[]] == 0) break;
+			    display[] += { i[] - coords[offset row] };
+			}
+			if (coords[current row]+coords[offset row] < len[] ) 
+			    if ( coords[index text row,coords[current row]+coords[offset row]] > 0)
+			    {
+				coords[current row] -= coords[index text row,coords[current row]+coords[offset row]];
+			    }
+		    }
+
+		    case ( '&pgdn;') // One page down
+		    {
+			display[] = {all}; // All
+			coords[offset row] = max(coords[offset row] + (coords[rows displayed] - coords[row heights,0]), 0);
+
+			while ( coords[offset row] + coords[rows displayed]  > len[] & (coords[offset row]>0) )
+			{
+			    coords[offset row]--;
+			}
+		    }
+
+		    case ( '&arrow-down;','&pgdn;' )
+		    {
+
+			while( coords[current row] >= coords[rows displayed])
+			{
+			    while (coords[current row] + coords[offset  row] < len[]-1 )
+			    {
+				if ( coords[index text row, coords[current row] + coords[offset  row]+1]  > 0 ) coords[current row]++; else: break;
+			    }
+			    
+			    display[] = {all}; // all
+			    coords[current row]--;
+			    coords[offset  row]++;
+			}
+		    }
+		}
+	
+	} while (find( return characters[], cmd[]) < 0);
+
+	if (variable view[])
+	{
+	    if (existing here(row[])) row[] = coords[row variable,coords[index table row,coords[current row]+coords[offset row]]];
+	    if (existing here(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
+	    table delete( table[] );
+	}
+	else // table view
+	{
+	    if (existing here(row[])) row[] = coords[index table row,coords[current row]+coords[offset row]];
+	    if (existing here(col[])) col[] = max 123(0,coords[current col])+coords[offset col];
+	}
+	echo;
+
+	if (coords[alt screen]) clear( select if (coords[alt screen], back, right below ) );
+
+    }
+    return ( cmd[] );
+
+}
+
+
+//
+// Inspect variables
+// _________________________________________________________________________________________________________
+//
+
+
+define additional procedure and function( variable view, table view, { { variable, all, reference }, {prompt, string}, { return characters, string}, { options, parameters }, { row, all, output }, { col, all, output } }, 3, 6 );
+
+define procedure( inspect, { { variable, all, reference }, { option, string } }, 1, 2 )
+{
+    local
+    {
+	if (!existing here(option[])) option[] = '';
+	if (option[]<>+json,'') { echo("Invalid option '", option[],"' will be ignored. Only valid option: 'json'."); sleep(1); }
+	variable view( variable[], "Press F1 key for help. Type 'Enter' whene done viewing.", new line, {wrap,alt screen,select no headers} + select if( (option[]=+json), {json},{})  );
+    }
+}
+
+
+
+
+
+//
+// View B4P Tables with Browsers
+// _________________________________________________________________________________________________________
+//
+
+
+    libraries[support library,browser excel file counter] = 0;	// Different file for every opening so the files are pushed onto Excel
+
+
+
+
+//
+// Following procedure upgrades HTML files saved with B4P to view with DataTables.
+//
+// All codes provided by SpryMedia Ltd, Scottland, are under the MIT license
+// This includes all related CSS and Javascipt code
+// Copyright Copyright (C) 2008-2020, SpryMedia Ltd.
+//
+// Known issues: Do not include any formatting (e.g. colors, different fonts, etc.) so far.
+//
+
+define procedure( __ prepare HTML for DataTables __, { { file name, string } } )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	table load		( _data_table, file name[], TEXT );
+
+	[_data_table:0,0] = 	"<!-- Datatable --> "; // Clear table 0
+	[_data_table:0,1] = 	[_data_table:0,1] - "<table  >"; // Remove the opening <table>.
+
+	path[] =		replace all( system info[program directory b4p] + "/", "\", "/" );
+
+	preamble[] = 
+	{	'<html><head><link rel="stylesheet" type="text/css" href="' + path[] + 'weblib/datatables/css/jquery.dataTables.min.css"></head>',
+		'<body>',
+		'<script type="text/javascript" charset="utf8" src="' + path[] + 'weblib/jquery/jquery-3.4.1.js"></script>',
+		'<script type="text/javascript" charset="utf8" src="' + path[] + 'weblib/datatables/js/jquery.dataTables.min.js"></script>',
+		'<table id="example" class="display compact order-column" style="width:100%">'
+	};
+	
+	trailer[] = 
+	{	// </table is already part of table
+		"<script> $(document).ready( function() { $('#example').DataTable(); } );  </script>",
+		'</body></html>',
+	};
+
+	table insert rows	( _data_table, 1, preamble[]{} );
+	[_data_table:0,..] = 	preamble[];
+
+	header row[] = 		preamble[]{}+1;
+
+	table header[] = 	[_data_table:0,header row[]];
+	table footer[] = 	"</tbody><tfoot>" + table header[] + "</tfoot>";
+	table header[] = 	"<thead>" + table header[] + "</thead><tbody>";
+
+	[_data_table:0,header row[]] = 			table header[];
+	[_data_table:0,table length(_data_table)-2] = 	table footer[] + "</table>";
+
+	table append		( _data_table, trailer[] );
+	table save 		(_data_table, file name[], new line );
+	table delete		( _data_table );
+    }
+}
+
+
+
+
+//
+// Delete all temporary files created in the working directory
+//	
+
+define procedure ( view reset ) // Clears all temprary files created.
+{
+	local() files[] = search files( ".", "_b4p_view*" );
+	if (files[] = {})
+	{
+	    echo("No temporary files to delete.");
+	}
+	else
+	{
+	    echo("Identified following files: ", join( files[], ", ") );
+	    pause("Continue with deleting these files?");
+	    file delete( files[] );
+	    echo("Done deleting.");
+	}
+}
+
+
+
+//
+// Open a web page
+//	
+
+define procedure ( openweb, { { url name, string } } )
+{
+    switch( function name[] ) // Names orignate from 'define additional procedure' calls below end of this function definition
+    {
+	case ( help welcome, docs )		url name[] = "https://www.b4p.app/index.html";
+	case ( help index, help keywords )	url name[] = "https://www.b4p.app/LIB_Features_Index.html";
+	case ( help user guide )		url name[] = "https://www.b4p.app/GUI_Features_User_Guide.html";
+	case ( help language )			url name[] = "https://www.b4p.app/LAN_Features_Language_Guide.html";
+	case ( help functions, help library )	url name[] = "https://www.b4p.app/LIB_Features_Function_Library.html";
+    }
+
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	browser[] = browser(get);
+
+	supported browsers[] = libraries[support library,supported browsers,system info[ operating system ]];
+	browser nr[] = find( supported browsers[], browser[] );
+
+	command[] = libraries[support library,supported browsers,system info[ operating system ],start]{browser nr[]};
+	if (browser[]=default)
+	{
+	    command[] += url name[];
+	}
+	else
+	{
+	    command[] += '"' + url name[] + '"';
+	}
+
+	if (system info[operating system]<>Windows) command[] += " &"; // Non-Windows: start task in background
+	system( command[] );
+
+    }
+}
+
+define additional procedure( help index,      openweb );
+define additional procedure( help keywords,   openweb );
+define additional procedure( help welcome,    openweb );
+define additional procedure( help user guide, openweb );
+define additional procedure( help language,   openweb );
+define additional procedure( help functions,  openweb );
+define additional procedure( help library,    openweb );
+
+
+
+
+//
+// Saves the table into a file and opens the browser or Excel immetiately thereafter
+//	
+
+
+define procedure ( view, { { table name, string }, { visualization tool, string } }, 1, 2 )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	if (!existing here(visualization tool[])) visualization tool[] = here;
+	browser[] = '';
+	datatables[] = false;
+
+	switch( visualization tool[] )
+	{
+	    case( here )
+	    {
+		table view( table name[], "Press F1 key for help. Type 'Enter' whene done viewing.", new line, {wrap, alt screen} );
+		return;
+	    }
+
+	    case( browser, datatables )
+	    {
+		supported browsers[]	= libraries[support library,supported browsers,system info[ operating system ]];
+		browser[]		= browser(get);
+		browser nr[]		= find( supported browsers[], browser[] );
+		command[]		= libraries[support library,supported browsers,Windows,start]{browser nr[]};
+		datatables[]		= visualization tool[] = datatables;
+		type[]			= ".html";
+		option[]		= HTML;
+	    }
+
+	    case( excel, csv, html, xml )
+	    {
+		if (system info[operating system]<>+Windows)
+		{
+		    echo("Sorry, but viewing files using Excel is presently supported on Windows systems only.");
+		    return;
+		}
+		command[]	= "start excel /r ";
+		type[]		= select by value( visualization tool[], excel, .xlsx, csv, .csv,  html, .html, xml, .xls );
+		option[]	= select by value( visualization tool[], excel, XLSX , csv, LOCAL, html, HTML , xml, EXCEL );
+	    }
+	    else
+	    {
+		echo("The specified visualization tool '", visualization tool[], "' is invalid or not supported");
+		return;
+	    }
+	}
+
+	file name[] = "_b4p_view_" + table name[] + select if( browser[]==excel, str(libraries[support library,browser excel file counter]++),"" ) + type[];
+
+	if (option[] == "XLSX")
+	{
+	    table save excel file( table name[], "Table", file name[] );
+	}
+	else
+	{
+	    table save ( table name[], file name[], option[] );
+	    if (datatables[]) __ prepare HTML for DataTables __( file name[] );
+	}
+
+
+	command[] += '"' + working directory() + system info[directory separator] + file name[] + '"';
+	if (system info[operating system]<>Windows) command[] += " &"; // Non-Windows: start task in background
+	system( command[] );
+
+	if (function name[]=view pause) pause("Displaying table '" + table name[] + "'" );
+    }
+}
+
+    //
+    // Following function works like 'view', but will pause before continuing.
+    //	
+
+
+    define additional procedure ( view pause, view, { { table name, string }, { visualization tool, string } }, 1, 2 );
+
+
+    //
+    // Interactive help features
+    // _________________________________________________________________________________________________________
+    //
+
+
+
+    define procedure ( help )
+    {
+      local // Ensure all variables firstly assigned do not interfere with equally named global variables
+      {
+	file name[] = system info[program directory b4p] + system info[directory separator] + "lib" + system info[directory separator] + "Interactive Help.txt";
+
+	saved[] = runtime settings[verbose]; 
+	runtime settings[verbose] = quiet;
+
+	table load( __ help __, file name[], TEXT );
+	runtime settings[verbose] = saved[];
+
+	table insert columns	( __ help __, Section, 0 );
+	table process		( __ help __, [Section] = str([Contents]){0}; [Contents] = right(str([Contents]),-2) ); // Remove digit and tab
+
+	section[] = 0;
+	last section[] = max 123 ( [__ help __ : Section, ..] );
+
+	do cls[]= true;
+
+	do
+	{
+		echo;
+		if (do cls[]) cls;
+		table process selected rows( __ help __, [Section]==section[], echo( [Contents] ) );
+		echo( str("","79_") );
+		action[] = +input quick ignore case ( compose( "Page [0]..[", last section[], "], [N]ext  [P]revious page  Clear [S]creen on/off  [Q]uit: "), join( { 0 .. last section[] } ) + "NPSQ"   );
+
+
+		switch(action[])
+		{
+		    case( '0' .. str(last section[]))	section[] = num( action[] );
+		    case( N )					if (section[] < last section[] ) section[]++;
+		    case( P )					if (section[] > 0 ) section[]--;
+		    case( S )					do cls[] = !do cls[];
+		}
+	}
+	while ( action[] <> 'Q' );
+	table delete ( __ help __ );
+      }
+    }
+
+
+
+    //
+    // Open web documentation
+    // _________________________________________________________________________________________________________
+    //
+
+
+define procedure ( docs, {{ keyword, string } }, 0, 1 )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	url[]				= "https://www.b4p.app/";
+	temp dir[] 			= system info[temp directory] + system info[directory separator];
+	toc file[]			= temp dir[] + "TOC.csv"; // Table of contents
+	docs file[]			= "index.html";
+
+	saved[] = runtime settings[verbose]; 
+	runtime settings[verbose] = quiet;
+
+	if (parameter count[]=0)
+	{
+	    html file name[] = docs file[];
+	    echo("Opening ", html file name[], " ..." );
+	    openweb( url[] + html file name[] );
+	    runtime settings[verbose] = saved[];
+	    return;
+	}
+
+	ret val[] 			= file download overwrite silently( url[] + "TOC.csv" , toc file[] );
+
+	if (ret val[] != OK) exception( interactive, "Function 'docs search': Cannot load table of contents file from the web." + new line + "Check if you have access to the Internet.", -1 );
+
+	mode[] = equals;		// Choices: equals, begins with, contains
+	if (parameter count[] == 0) 	{ keyword[] = ""; mode[] = begins with; } // All contents
+
+	table load			( __ toc __, toc file[] );
+	table process			( __ toc __, all keywords[] += tokenize( [Keywords], {}, "," ); all features[] += tokenize( [Feature Names], {}, "," ) );
+
+	table process 			( __ toc __, [Keywords] = join( parameter set([Feature Names]) | parameter set([Keywords]), "," );
+						[Feature Names] = parameter set([Keywords]){} );
+	table rename column headers	( __ toc __, Feature Names, Keyword Count );
+
+	table insert columns		( __ toc __, {Upper Section Nr, Upper Section Name}, {'',''}, Section Nr );
+	table process			( __ toc __, [Upper Section Nr] = left last match( [Section Nr], '.' ) );
+	table lookup			( __ toc __, Upper Section Nr, Upper Section Name, __ toc __, Section Nr, Section Name );
+
+	table insert selected rows	( __ toc __, true /* all */, [Keyword Count]-1, { Section Nr, Section Name, Upper Section Nr, Upper Section Name, Keywords, HTML File Name }, Keyword Count );
+	table process			( __ toc __, [Keywords] = parameter set([Keywords]){[Keyword Count]} );
+	table delete columns		( __ toc __, Keyword Count );
+	table sort selected rows	( __ toc __, [Section Name] != 'Table of Contents', Keywords, alphabetic ignore case );
+	table keep columns		( __ toc __, { Section Nr, HTML File Name, Upper Section Name, Section Name, Keywords } );
+	table insert columns		( __ toc __, Match );
+	table process cells		( __ toc __, [.] = decode entities([.]) );
+
+	table rearrange columns		( __ toc __, { Section Nr,Keywords,HTML File Name } );
+	table process			( __ toc __,
+		sect[] = str( [Section Nr] ) - 'B'; // Section Number, but begins with space
+		if (sect[] = ' ##*') sect[] -= ' ';	// Double digit: Remove leading space
+		substitute all( sect[], ".0", ". " );
+		[Section Nr] = [HTML File Name]{0..2} + ' ' + sect[] ); 
+
+
+	// Next step: Preselect by entering the keyword
+
+	matches[] = 0;
+	if (parameter count[] > 0)
+	{
+		expr[] = "[Keywords]=+'" + keyword[]+"'";
+		matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+
+		if (matches[] = 0)
+		{
+			expr[] = "[Keywords]=+'" + keyword[]+"*'"; // No match, try with 'begins with'
+			matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+			mode[] = begins with;
+		}
+	}
+	else // List all
+	{
+		matches[] = table process( __ toc __, [Match] = Yes );
+	}
+
+	table copy table 		( __ toc __, __ toc2 __ );
+	table keep selected rows	( __ toc2 __, [Match] = Yes );
+
+	if (matches[] = 0)
+	{
+	    echo('&warning;No matches found with keyword &high;', keyword[], '&warning;.&default;');
+	}
+
+	echo(new line, "How to access B4P on-line documentation -- Examples..." );
+	echo(          'Exmaple:  &high;docs                 &default; opens the landing page of the B4P documentation');
+	echo(          '          &high;docs ( echo )        &default; looks for help for &high;echo&default;');
+	echo(          '          &high;docs ', "( 'table*' )",   '    &default; looks for keywords beginning with &high;table&default; ', new line);
+	echo(          '          &high;docs ', "( '*search*' )", '    &default; looks for keywords containing &high;search&default; ', new line);
+	echo(          "Use 'single' quotation marks when using wildcard symbols *,?,etc.", new line);
+
+	if (matches[] = 1)
+	{
+	    html file name[] = [__ toc2 __:HTML File Name,1];
+	    echo("Opening ", html file name[], " ..." );
+	    openweb( url[] + html file name[] );
+	}
+	else: if (matches[] > 1)
+	{
+	    clear(alt);
+	    do
+	    {
+		choice[] = table view( __ toc2 __, "B4P Documentation Searcher" + new line + "F1: Help, F2: Edit search, Space bar: Select, Enter: Select+Leave, Escape: Leave", '&f2;&nl;&escape; ', {select no headers, allow sorting}, row[] );
+		html file name[] = [__ toc2 __:HTML File Name,row[]];
+
+		if (choice[]='&f2;')
+		{
+		    echo("Press [Enter] to confirm, [Escape] to leave. Press F3 to change between equals/starts with/contains.");
+
+		    do
+		    {
+			expr[] = "[Keywords]=+'" + select ifs( keyword[], mode[] == begins with, keyword[]+'*', mode[] == contains, '*'+keyword[]+'*' ) + "'";
+			matches[] = table process selected rows( __ toc __, :expr[], [Match] = Yes, [Match] = No );
+			print(chr(13),mode[],'&tab13; (', str( matches[], "???0" ),' ): ', keyword[]);
+			ch[] = getch();
+			if ( ch[] == '&#x7f;' ) ch[] = '&ctrl-h;'; // Backspace
+
+			switch( ch[] )
+			{
+			    case( '&ctrl-h;' ) // Backspace, Delete
+			    {
+				if (keyword[]{}>0) keyword[] = keyword[]{0..-2};
+				print(chr(8), "   ");
+			    }
+			    case( '&f3;')
+			    {
+				if 	(mode[] = equals) mode[] = begins with;
+				else:if (mode[] = begins with) mode[] = contains;
+				else:    mode[] = equals;
+			    }
+			    case( >= ' ' ) // Visible characters
+			    {
+				keyword[] += ch[];
+			    }
+			}
+		    }
+		    while (ch[] <> new line, escape);
+		    echo;
+
+		    table copy table 		( __ toc __, __ toc2 __ );
+		    table keep selected rows	( __ toc2 __, [Match] = Yes );
+		}
+		if (choice[]=new line,' ') if (table length(__ toc2 __)>1) openweb( url[] + html file name[] );
+
+	    } while (choice[]<>new line,escape);
+	    clear(back);
+	}
+	else: html file name[] = [ __ toc2 __: HTML File Name, 1 ]; // Only 1 entry inside
+
+	table delete ( __ toc __, __ toc2 __ );
+	
+	runtime settings[verbose] = saved[];
+    }
+}
+
+
+
+//
+// File Brower
+// _________________________________________________________________________________________________________
+//
+
+
+
+//	File browser function
+//	Prompt: If no new line, then it is prompt alone.  If 1 new line: Header + prompt.  
+//	
+//	path		Initial directory path, e.g. "." for current directory
+//	pattern		File input pattern, e.g. ".xlsx,*.xlsm"
+//	options		Browser specific options
+//		files only		Do not show directories, so browsing directories is suppressed
+//		colors 			Assign characteristic colors to commonly known files (e.g. office files)
+//		file names ignore case	Ignore case even in LINUX/MACOS systems
+//		open files		Support opening files using space bar
+//		Additional options as described in table view: alt screen, ignore case, no deco, no input, full row cursor
+
+
+define procedure and function( __ file browser callback function __ , {{ table name, string }, { cmd, string}, { row, numeral }, { column, numeral }} )
+{
+    local
+    {
+	file name[] = str([ table name[] : Name, row[] ]){0..-2};
+	if (file name[]{0} > '&#x100000;') file name[] = file name[]{1..-1};
+
+	if (cmd[] == ' ')
+	{
+	    open( file name[] );
+	}
+    }
+}
+
+
+define procedure and function ( file browser, { { prompt, string }, { path, string }, { pattern, string }, { options, parameters }}, 0, 4 )
+{
+    local
+    {
+
+	table initialize( __ color table __, 
+	    {	{ Pattern, 			    Directory,	Type,			Color },
+		{ '*.xlsx,*.xlsm,*.xlsb,*.xls,*.xlst',  No,	"Spreadsheet",		green },
+		{ '*.docx,*.doc', 			No,	"Document",		light lapis, },
+		{ '*.txt,*.md', 			No,	"Text file",		white },
+		{ '*.csv,*.dat', 			No,	"Text based data",	granny },
+		{ '*.ppt,*.pptx', 			No,	"Presentation",		red },
+		{ '*.pdf', 				No,	"PDF File",		light pink },
+		{ '*.zip,*.7z,*.tar,*.gz,*.jar',	No,	"Compressed / Archive",	light tan },
+		{ '*.html,*.htm,*.css', 		No,	"Web data file",	cyan },
+		{ '*.json,*.xml',			No,	"Structured data file",	light violet },
+		{ '*.exe', 				No,	"Executable file",	gray },
+		{ '*.b4p', 				No,	"B4P program",		light blue },
+		{ '*.jpg,*.jpeg,*.gif,*.tif,*.tiff,*.png,*.bnp', No, "Image",		yellow },
+		{ '*.c,*.cpp,*.h,*.vba,*.py,*.asm,*.java,*.js', No, "Source code file",	ocean },
+		{ '*',					No,	"Other file type",	light gray },
+		{ '*',					Yes,	"Folder",		light orange }
+	    } );
+
+	// Define default parameters
+	
+	if (!existing here(prompt[]))	prompt[]	= 'Select file: ';		// Default: No options.
+	if (!existing here(path[]))	path[]		= '.';				// Default: Current path
+	if (!existing here(pattern[]))	pattern[]	= '*';				// Default: All files
+	if (!existing here(options[]))	options[]	= {};				// Default: No options.
+
+
+	// Identify the options
+
+	opt[open files] = false;
+	opt[files only] = false;
+
+	file names ignore case[] = system info[operating system] == Windows; // LINUX and LINUX are not case sensitive
+	opt[table] = { hide row numbers, select no headers, allow sorting };
+	for all parameters( options[], option[] ) switch( option[] )
+	{
+	    case( files only)			opt[files only] = true;
+	    case( colors )			opt[colors]	= true;
+	    case( return path )			opt[return path] = true;
+	    case( open files )			opt[open files] = true;
+	    case( file names ignore case )	file names ignore case[] = true;
+	    case( alt screen, ignore case, no deco, no input, full row cursor ) opt[table]	|= {option[]};
+
+	    else:			
+		exception( stop, compose("Function 'file browser':", new line, "3rd parameter: options contains an invalid option: '", option[],"." ), 1);
+	}
+
+
+	keys[] = new line + escape;
+	if (!opt[files only]) // Include characters for file input ...
+	{
+	    for( i[]=33, i[] < 1024, i[]++ ) keys[] += chr(i[]);
+	}
+
+
+	// Memorize original path and set initial path.
+
+	if (!directory existing(path[]))
+	{
+	    exception( interactive, compose("Function 'file brower': Directory path '", path[], "' is invalid or does not exist.") , 1 );
+	}
+
+	path[original] 			= working directory();
+	working directory		( path[] );
+	path[] 				= working directory();
+
+	clear(alt);
+	do
+	{
+	    continue[] 				= false;
+	    directory listing			( __ dir __ );
+
+	    if (pattern[] != '')
+	    {
+		if (file names ignore case[])
+		{
+	            table keep selected rows    ( __ dir __, ([Name]=+soft(pattern[])) | [Directory]==Yes ); // Note the plus sign
+		}
+		else
+		{
+	            table keep selected rows    ( __ dir __, ([Name]=soft(pattern[])) | [Directory]==Yes );
+		}
+	    }
+
+	    if (!opt[files only])
+	    {
+		table insert rows		( __ dir __, 1 );
+		[ __ dir __:Name,1]		= ".." + system info[directory separator];
+	    }
+	    else
+	    {
+	        table delete selected rows    	( __ dir __, [Directory]==Yes );
+	    }
+
+	    table lookup smart ignore case	( __ dir __, {Name, Directory}, {Type,Color}, __ color table __, {Pattern, Directory}, {Type,Color} );
+	    if (existing here(opt[colors])) // Color the files
+	    {
+		table process selected rows	( __ dir __, [Color]!='', [Name] = decode entities( '&' + [Color] + ';' + [Name] ));
+		table process selected rows	( __ dir __, [Color]!='', [Type] = decode entities( '&' + [Color] + ';' + [Type] ));
+	    }
+	    table process			( __ dir __, [Date Updated] += ' ' + [Time Updated]; [Name] += ' '; [Type] += ' ';);
+	    table process			( __ dir __, 
+		switch( [Size] )
+		{
+		    case ('',0)		[Size] = '';
+		    case (<10000)	[Size] = str([Size],'?,??0  ', local) + " bytes";
+		    case (<10000000)	[Size] = str([Size]/1000,'?,??0.0', local) + " Kb";
+		    case (<10000000000)	[Size] = str([Size]/1000000,'?,??0.0', local) + " Mb";
+		    else:		[Size] = str([Size]/1000000000,'?,??0.0', local) + " Gb";
+		} );
+	    table delete columns		( __ dir __, { Time Updated, Directory, Color } );
+	    table rename headers		( __ dir __, Date Updated, Last Update );
+	    table keep columns			( __ dir __, { Name, Type, Size, Last Update } );
+
+
+	    prompt[headline] = '';
+	    prompt[command]  = '';
+	    if (existing here(prompt[]))
+	    {
+		if ( find(prompt[], new line ) >= 0)
+		{
+	            prompt[headline] = left(prompt[], new line);
+		    prompt[command]  = right(prompt[], new line);
+		}
+		else
+		{
+		    prompt[command] = prompt[];
+		}
+	    }
+
+	    if (prompt[command]=='') prompt[command] = "Select directory, push 'Enter', then select file, push 'Enter' again: ";
+	    prompt[use] = prompt[headline] + path[] + new line + prompt[command];
+	    cls;
+	    cmd[] = table view( __ dir __, prompt[use], keys[], opt[table], row[], col[], __ file browser callback function __, select if( opt[open files] , ' ', '' ) );
+	    if (cmd[] == escape) 
+	    {
+		clear(back);
+		return( '' );
+	    }
+
+	    file name[] = str([ __ dir __ : Name, row[] ]){0..-2};
+	    if (file name[]{0} > '&#x100000;') file name[] = file name[]{1..-1};
+
+	    if (cmd[]==new line & ( right(file name[],1) = system info[directory separator] ) )
+	    {
+		working directory( file name[] );
+		path[] = working directory();
+		continue[]= true;
+	    }
+
+	    if (cmd[]>' ')
+	    {
+		echo;
+		path[] = working directory();
+		new path[] = trim( input to complete( cmd[], "Enter new path name: ", string ) );
+		if (directory existing(new path[]))
+		{
+
+		    working directory(new path[]);
+		    path[] = working directory();
+		} 
+		continue[] = true;
+	    }
+
+
+	} while (continue[]);
+	clear(back);
+
+	working directory( path[original] );
+    }
+    if (!opt[files only]) file name[] = path[] + system info[directory separator] + file name[];
+
+    table delete( __ dir __, __ color table __ );
+    return( file name[] );
+}
+
+
+define procedure and function( dir, { { path, string }, { pattern, string } }, 0, 2 )
+{
+    local
+    {
+	if (!existing here(path[]))	path[] = '.';
+	if (!existing here(pattern[]))	pattern[] = '*';
+
+	file[] = file browser( "[Space] to open file, [Enter] to change directory, [Escape] when done: ", path[], pattern[], { colors, file names ignore case, open files } );
+    }
+    return(file[]);
+}
+
+
+} // once ()
+
