@@ -11,8 +11,12 @@ A language and engine for processing tabular data
 
 ### Script
 ```text
-wget https://github.com/georgzurbonsen/Beyond4P_Distribution/blob/master/current/b4p_linux.tar.gz
-tar -xvzf b4p_linux.tar.gz
+cd $HOME
+# wget file as 'raw' to avoid conversion to HTML
+wget --no-check-certificate https://github.com/georgzurbonsen/Beyond4P_Distribution/raw/master/current/b4p_linux.tar.gz
+# xtract file
+tar -xf b4p_linux.tar.gz
+chmod -R 755 b4p_installation
 cd b4p_installation/
 sudo ./setup --choice=machine --locale=en_US
 ```
