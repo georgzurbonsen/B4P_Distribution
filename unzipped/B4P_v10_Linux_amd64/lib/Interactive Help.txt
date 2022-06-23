@@ -54,7 +54,7 @@ Contents
 1	docs ( 'for*' )                 Search for or keywords starting with 'for'
 1	                                and then choose the docs to read.
 1	docs ('*')                      Search for all keywords, then select to open
-1
+1       toc                             Access table of contents of all documents
 1       browser (set)                   Select a different browser for web access
 1
 
@@ -68,7 +68,7 @@ Contents
 2	list functions ( '*if*' )       Lists all functions containing 'if'
 2
 2	explain functions               Lists all procedures and functions
-2	explain functioos ( 'c*')       Explain all of functions starting with 'c'
+2	explain functions ( 'c*')       Explain all of functions starting with 'c'
 2	explain functions ( for )       Explain the 'for' procedure
 2
 2	dump functions( [table name] )  Dumps all functions with details in a table
@@ -107,8 +107,8 @@ Contents
 3	        = table length( my table name )
 3	
 3	
-3	For more information, type:     docs search (interactive statements)
-3	                                docs search (interactive expressions)
+3	For more information, type:     docs (interactive statements)
+3	                                docs (interactive expressions)
 
 
 
@@ -122,8 +122,8 @@ Contents
 4
 4	table list ( [mytable] )           Outputs contents of 'mytable' to the console
 4
-4	view ( [mytable] )                 View 'mytable' in remembered browser
-4	view ( [mytable], [tool] )         View 'mytable' in a specified browser
+4	view ( [mytable] )                 View 'mytable' in remembered browser or here
+4	view ( [mytable], [tool] )         View 'mytable' in different way, see below
 4
 4	Examples:
 4	    view ( mytable )               View interactively on the console
@@ -161,8 +161,8 @@ Contents
 5	                                 = a[]       display variable
 5	                                 = a[1]      display first element of variable
 5	
-5	For more information, type:     docs search (list variables)
-5	                                docs search (inspect)
+5	For more information, type:     docs (list variables)
+5	                                docs (inspect)
 
 
 6	
@@ -185,10 +185,10 @@ Contents
 6	
 6	
 6	
-6	For more information, type:     docs search (basic commands)
-6	                                docs search (start)
-6	                                docs search (prompt)
-6	                                docs search (return)
+6	For more information, type:     docs (basic commands)
+6	                                docs (start)
+6	                                docs (prompt)
+6	                                docs (return)
 
 
 7	
@@ -213,5 +213,5 @@ Contents
 7	working directory inside B4P run time machine will also change.
 7
 7	
-7	For more information, type:     docs search (os commands)
-7	                                docs search (system)
+7	For more information, type:     docs (os commands)
+7	                                docs (system)

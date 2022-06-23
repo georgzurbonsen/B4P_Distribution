@@ -46,6 +46,7 @@
 	3.11	9.01a		2022-02-15	Validated 'dir', and 'openweb' supports default browser.
 	3.12	9.01a		2022-02-16	bugfix
 	4.00	10.00		2022-03-15	literal -> string, etc.
+	4.01	10.00		2022-05-01	Added 'toc', improved 'dir', 'view', 'inspect'
 
 */
 
@@ -337,7 +338,8 @@ define procedure( __ internal table display row __, { { table, string }, { coord
     t[] = coords[index text  row,coords[row]]; // Text row
     p[] = coords[index table row,coords[current row]+coords[offset row]]; // Current row pointed
 
-//    beyond end of table[] = 
+    column count[] = member count( coords[col widths] );
+
 
 
     with table( table[], r[] )
@@ -352,8 +354,10 @@ define procedure( __ internal table display row __, { { table, string }, { coord
 
         if (coords[deco]) print( select if (coords[row]<coords[row heights,0], '&DECO 4;', select if( even(r[]), '&DECO 1;', '&DECO 2;' )) );
 
-	while( x[] < member count( coords[col widths] ))
+
+	while( x[] < column count[] )
 	{
+
 	    if ((xscr[] + coords[col widths,x[]] + 1) > coords[console width]) break loop;
 	    coords[cols displayed]++;
 
@@ -517,14 +521,13 @@ define procedure and function( table view,
 	if (!existing here( callback function name[] ))		callback function name[] = '';
 	if (!existing here( callback characters[] ))		callback characters[] = '';
 
-
 	variable view[] = function name[] = 'variable view';
 
 	// Step 1 - Identify column widths for display purposes
 
 
-	structure( coords[], { offset row, offset col, current row, current col, min row, max row, min col, full col, max col, console width,  console height,  show row numbers, select headers, deco, do input, wrap,  alt screen, json},
-			     { 0,          0,          0,           0,           1,       4,       3,       50,       60,      console(width), console(height), true,             true,           true, true,     false, false,      false  } );
+	structure( coords[], { column count, offset row, offset col, current row, current col, min row, max row, min col, full col, max col, console width,  console height,  show row numbers, select headers, deco, do input, wrap,  alt screen, json},
+			     { 0,            0,          0,          0,           0,           1,       4,       3,       50,       60,      console(width), console(height), true,             true,           true, true,     false, false,      false  } );
 
 
 	if (!existing here(options[])) options[] = {}; // Default: No options.
@@ -551,8 +554,7 @@ define procedure and function( table view,
 	    }
 	}
 
-	column count[] = table max width( table[] );
-
+	coords[column count] = table max width( table[] );
 
 	// coords[] - Explanation
 
@@ -606,6 +608,7 @@ define procedure and function( table view,
 	allow sorting[] = false;
 	for all parameters( options[], option[] ) switch( option[] )
 	{
+	    case ('# columns','# column') coords[column count] = min 123( num(option[]), coords[column count] ); // Reduce number of columns
 	    case (full row cursor)	coords[current col] = -1;
 	    case (hide row numbers)	coords[show row numbers] = false;
 	    case (select no headers)	coords[select headers] = false;
@@ -669,10 +672,9 @@ define procedure and function( table view,
 
 		    // Identify the number and widths of all columns
 
-		    if (!existing(coords[col widths])) dim( coords[col widths], column count[], 1 );
+		    if (!existing(coords[col widths])) dim( coords[col widths], coords[column count], 1 );
 
-		    cmax[] = table max width( table[] );
-		    for (c[] = 0, c[] < cmax[], c[] ++) with table( table[], 0, c[] )
+		    for (c[] = 0, c[] < coords[column count], c[] ++) with table( table[], 0, c[] )
 		    {
 			vector[] = deep( width, {[.,] } );
 			max[] = max 123( vector[] );						// Maximum width
@@ -793,11 +795,11 @@ define procedure and function( table view,
 		    {
 			echo;
 			clear(right below);
-			echo('Navigation:                 &larr; &rarr; &uarr; &darr;, home, ctrl-home, end, ctrl-end, pg up, pg dn');
-			echo("Change widths, heights:     ctrl- &larr; ctrl- &rarr; ctrl- &uarr; ctrl- &darr;");
-			echo("Copy field to clipboard:    ctrl-c (press once only)");
-			if (variable view[])		  print("Inspect member variables:   + (expand), > (expand all), - (contract), f3 (info)");
-			if (allow sorting[])		  print("Sorting:                    Select column, then press f4");
+			echo('Navigation:                 arrow keys: &larr; &rarr; &uarr; &darr;, home, ctrl-home, end, ctrl-end, pg up, pg dn');
+			echo('Change widths, heights:     ctrl-arrow keys: &larr; &rarr; &uarr; &darr;');
+			echo('Copy field to clipboard:    ctrl-c (press once only)');
+			if (variable view[])		  print("Expand: +   Expand all: >  Contract: -   Info: F3");
+			if (allow sorting[])		  print("Sorting: Select column, then press F4");
 			clear below[] = false;
 		    }
 
@@ -819,7 +821,13 @@ define procedure and function( table view,
 		    {
 			if (allow sorting[])
 			{
-			    table sort rows( table[], c[] );
+			    if (!existing here(c previous[])) c previous[] = -1; // Define this variable if not yet existing to memorize previous column
+			    if (!existing here(sort reverse[])) sort reverse[] = false; // Define this variable if not yet existing to memorize previous column
+
+			    sort reverse[] = select if( c[] == c previous[], !sort reverse[], false );
+			    c previous[] = c[];
+			    table sort rows( table[], c[], select if( sort reverse[], alphabetic down, alphabetic ) );
+
 			    redim table[]= true;
 			    recalculate row index[] = true;
 			    display[] = {all};
@@ -873,7 +881,7 @@ define procedure and function( table view,
 		    case ( '&end;' ) // Go to last column
 		    {
 			if (coords[current col] > 0) coords[current col] = 0; // Keep negative value because it marks entire row
-			coords[offset col] = column count[]-1;
+			coords[offset col] = coords[column count]-1;
 			display[] = {all};
 		    }
 
@@ -904,7 +912,7 @@ define procedure and function( table view,
 		    {
 			if (coords[current col]<0)
 			{
-			    if (coords[offset col] < column count[]-1) coords[offset col]++;
+			    if (coords[offset col] < coords[column count]-1) coords[offset col]++;
 			    display[] = {all};
 			    break;
 			}
@@ -915,7 +923,7 @@ define procedure and function( table view,
 			}
 			else
 			{
-			    if (coords[current col] + coords[offset col] < column count[]-1)
+			    if (coords[current col] + coords[offset col] < coords[column count]-1)
 			    {
 				coords[offset col]++;
 				display[] = {all};
@@ -1066,7 +1074,16 @@ define procedure and function( table view,
 //
 
 
-define additional procedure and function( variable view, table view, { { variable, all, reference }, {prompt, string}, { return characters, string}, { options, parameters }, { row, all, output }, { col, all, output } }, 3, 6 );
+define additional procedure and function( variable view, table view, 
+	{ { variable, all, reference }, 
+	  {prompt, string}, 
+	  { return characters, string}, 
+	  { options, parameters }, 
+	  { row, all, output }, 
+	  { col, all, output },
+	  { callback function name, string }, 			// Optionally specify callback function
+	  { callback characters, string } }, 3, 8 );		// Specify characters which invoke callback function
+
 
 define procedure( inspect, { { variable, all, reference }, { option, string } }, 1, 2 )
 {
@@ -1179,11 +1196,11 @@ define procedure ( openweb, { { url name, string } } )
 {
     switch( function name[] ) // Names orignate from 'define additional procedure' calls below end of this function definition
     {
-	case ( help welcome, docs )		url name[] = "https://www.b4p.app/index.html";
-	case ( help index, help keywords )	url name[] = "https://www.b4p.app/LIB_Features_Index.html";
-	case ( help user guide )		url name[] = "https://www.b4p.app/GUI_Features_User_Guide.html";
-	case ( help language )			url name[] = "https://www.b4p.app/LAN_Features_Language_Guide.html";
-	case ( help functions, help library )	url name[] = "https://www.b4p.app/LIB_Features_Function_Library.html";
+	case ( help welcome, docs )		url name[] = system info[url] + "index.html";
+	case ( help index, help keywords )	url name[] = system info[url] + "LIB_Features_Index.html";
+	case ( help user guide )		url name[] = system info[url] + "GUI_Features_User_Guide.html";
+	case ( help language )			url name[] = system info[url] + "LAN_Features_Language_Guide.html";
+	case ( help functions, help library )	url name[] = system info[url] + "LIB_Features_Function_Library.html";
     }
 
     local // Ensure all variables firstly assigned do not interfere with equally named global variables
@@ -1360,7 +1377,6 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 {
     local // Ensure all variables firstly assigned do not interfere with equally named global variables
     {
-	url[]				= "https://www.b4p.app/";
 	temp dir[] 			= system info[temp directory] + system info[directory separator];
 	toc file[]			= temp dir[] + "TOC.csv"; // Table of contents
 	docs file[]			= "index.html";
@@ -1372,12 +1388,12 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 	{
 	    html file name[] = docs file[];
 	    echo("Opening ", html file name[], " ..." );
-	    openweb( url[] + html file name[] );
+	    openweb( system info[url] + html file name[] );
 	    runtime settings[verbose] = saved[];
 	    return;
 	}
 
-	ret val[] 			= file download overwrite silently( url[] + "TOC.csv" , toc file[] );
+	ret val[] 			= file download overwrite silently( system info[url] + "TOC.csv" , toc file[] );
 
 	if (ret val[] != OK) exception( interactive, "Function 'docs search': Cannot load table of contents file from the web." + new line + "Check if you have access to the Internet.", -1 );
 
@@ -1450,14 +1466,14 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 	{
 	    html file name[] = [__ toc2 __:HTML File Name,1];
 	    echo("Opening ", html file name[], " ..." );
-	    openweb( url[] + html file name[] );
+	    openweb( system info[url] + html file name[] );
 	}
 	else: if (matches[] > 1)
 	{
 	    clear(alt);
 	    do
 	    {
-		choice[] = table view( __ toc2 __, "B4P Documentation Searcher" + new line + "F1: Help, F2: Edit search, Space bar: Select, Enter: Select+Leave, Escape: Leave", '&f2;&nl;&escape; ', {select no headers, allow sorting}, row[] );
+		choice[] = table view( __ toc2 __, "B4P Documentation Searcher" + new line + "F1: Help, F2: Edit search, Space bar: Select, Enter: Select+Leave, Escape: Leave ->", '&f2;&nl;&escape; ', {select no headers, allow sorting}, row[] );
 		html file name[] = [__ toc2 __:HTML File Name,row[]];
 
 		if (choice[]='&f2;')
@@ -1497,7 +1513,7 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 		    table copy table 		( __ toc __, __ toc2 __ );
 		    table keep selected rows	( __ toc2 __, [Match] = Yes );
 		}
-		if (choice[]=new line,' ') if (table length(__ toc2 __)>1) openweb( url[] + html file name[] );
+		if (choice[]=new line,' ') if (table length(__ toc2 __)>1) openweb( system info[url] + html file name[] );
 
 	    } while (choice[]<>new line,escape);
 	    clear(back);
@@ -1513,7 +1529,7 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 
 
 //
-// File Brower
+// File Browser
 // _________________________________________________________________________________________________________
 //
 
@@ -1573,6 +1589,17 @@ define procedure and function ( file browser, { { prompt, string }, { path, stri
 
 	// Define default parameters
 	
+	if (existing here(path[]))
+	{
+	    if (!directory existing( path[] ) )
+	    {
+		exception( stop, compose("Function 'file browser':", new line, "2nd parameter: Invalid path name: ", path[] ), 1);
+		return;
+	    }
+	}
+	else: path[] = '.';
+
+
 	if (!existing here(prompt[]))	prompt[]	= 'Select file: ';		// Default: No options.
 	if (!existing here(path[]))	path[]		= '.';				// Default: Current path
 	if (!existing here(pattern[]))	pattern[]	= '*';				// Default: All files
@@ -1652,19 +1679,15 @@ define procedure and function ( file browser, { { prompt, string }, { path, stri
 		table process selected rows	( __ dir __, [Color]!='', [Name] = decode entities( '&' + [Color] + ';' + [Name] ));
 		table process selected rows	( __ dir __, [Color]!='', [Type] = decode entities( '&' + [Color] + ';' + [Type] ));
 	    }
-	    table process			( __ dir __, [Date Updated] += ' ' + [Time Updated]; [Name] += ' '; [Type] += ' ';);
 	    table process			( __ dir __, 
-		switch( [Size] )
-		{
-		    case ('',0)		[Size] = '';
-		    case (<10000)	[Size] = str([Size],'?,??0  ', local) + " bytes";
-		    case (<10000000)	[Size] = str([Size]/1000,'?,??0.0', local) + " Kb";
-		    case (<10000000000)	[Size] = str([Size]/1000000,'?,??0.0', local) + " Mb";
-		    else:		[Size] = str([Size]/1000000000,'?,??0.0', local) + " Gb";
-		} );
+			[Date Updated]			 = ' ' + [Date Updated] + ' ' + [Time Updated]; 
+			[Name] 				+= ' '; 
+			[Type] 				+= ' ';
+			[Size] 				= str(num([Size]),'???,???,???,??0 ', local)  );
+
 	    table delete columns		( __ dir __, { Time Updated, Directory, Color } );
-	    table rename headers		( __ dir __, Date Updated, Last Update );
-	    table keep columns			( __ dir __, { Name, Type, Size, Last Update } );
+	    table keep columns			( __ dir __, { Name, Type, Size, Date Updated } );
+	    table rename headers		( __ dir __, { Size, Date Updated }, { '   Size (bytes)', ' Last Update' } );
 
 
 	    prompt[headline] = '';
@@ -1702,18 +1725,57 @@ define procedure and function ( file browser, { { prompt, string }, { path, stri
 		continue[]= true;
 	    }
 
-	    if (cmd[]>' ')
+	    if (cmd[]>' ') // Text input
 	    {
+		continue[] = true;
 		echo;
 		path[] = working directory();
 		new path[] = trim( input to complete( cmd[], "Enter new path name: ", string ) );
 		if (directory existing(new path[]))
 		{
-
 		    working directory(new path[]);
 		    path[] = working directory();
-		} 
-		continue[] = true;
+		}
+		else: if (file existing(new path[]))
+		{
+
+		    match[] = true;
+		    if (pattern[] != '')
+		    {
+			if (file names ignore case[])
+			{
+			    match[] = right(path[], system info[directory separator]) = +soft(pattern[]);
+			}
+			else
+			{
+			    match[] = right(path[], system info[directory separator]) = soft(pattern[]);
+			}
+		    }
+		    if (match[])
+		    {
+			if ( opt[open files] )
+			{
+			    open (new path[]);
+			}
+			else
+			{
+			    file name[] = new path[];
+			    continue[] = false;
+			}
+		    }
+		    else
+		    {
+		    echo('&warning;Specified file in path "', new path[], '" does not match with specified pattern.&default;');
+		    echo('Returning in 3 seconds, hit any key to return now');
+		    wait(3);
+		    }
+		}
+		else
+		{
+		    echo('&warning;Directory path "', new path[], '" not found.&default;');
+		    echo('Returning in 3 seconds, hit any key to return now');
+		    wait(3);
+		}
 	    }
 
 
@@ -1733,14 +1795,89 @@ define procedure and function( dir, { { path, string }, { pattern, string } }, 0
 {
     local
     {
-	if (!existing here(path[]))	path[] = '.';
+	if (existing here(path[]))
+	{
+	    if (!directory existing( path[] ) )
+	    {
+		echo('&warning;The directory "', path[], '" does not exist&default;');
+		return;
+	    }
+	}
+	else: path[] = '.';
 	if (!existing here(pattern[]))	pattern[] = '*';
 
-	file[] = file browser( "[Space] to open file, [Enter] to change directory, [Escape] when done: ", path[], pattern[], { colors, file names ignore case, open files } );
+	file[] = file browser( "[F1]: Help;  [Space]: Open file; [Enter]: Change directory or return selected file name; [Escape]: Exit -> ", path[], pattern[], { colors, file names ignore case, open files } );
     }
     return(file[]);
 }
 
 
+
+
+define procedure and function( __ open HTML from variable callback function __ , {{ table name, string }, { cmd, string}, { row, numeral }, { column, numeral }} )
+{
+	table copy table		( __ variable table view __, __ variable table copy __ );
+	table process selected rows	( __ variable table copy __, ([Variable Name] <> '*: *'), [Variable Name] = '');
+	table fill vertically		( __ variable table copy __, Variable Name );
+	table process			( __ variable table copy __, [Variable Name] = right( right( [Variable Name], '+ '),'- ')  );
+	table lookup			( __ variable table copy __, { Variable Name, Contents }, HTML File Name, __ toc __, { Book, Section Name }, HTML File Name ); 
+	table lookup			( __ variable table copy __, { Variable Name }, HTML File Name, __ toc __, { Book }, HTML File Name, [HTML File Name]='' );   // For book headers (no section numbers)
+
+	html file name[] 		= [__ variable table copy __ : HTML File Name, row[] ];
+	echo				(new line, "Opening ", html file name[] );
+
+        openweb				( system info[url] + html file name[] );
+	table delete 			( __ variable table copy __ );
+}
+
+
+
+
+define procedure ( toc  )
+{
+    local // Ensure all variables firstly assigned do not interfere with equally named global variables
+    {
+	temp dir[] 			= system info[temp directory] + system info[directory separator];
+	toc file[]			= temp dir[] + "TOC.csv"; // Table of contents
+
+	saved[] = runtime settings[verbose]; 
+	runtime settings[verbose] = quiet;
+
+	ret val[] 			= file download overwrite silently( system info[url] + "TOC.csv" , toc file[] );
+	if (ret val[] != OK) exception( interactive, "Function 'toc': Cannot load table of contents file from the web." + new line + "Check if you have access to the Internet.", -1 );
+
+	table load			( __ toc __, toc file[] );
+	table process			( __ toc __, [Section Name] = decode entities( [Section Name] ) );
+	table keep selected rows	( __ toc __, ([Section Nr]='B *') & [HTML File Name]!='');
+	table configure			( __ toc __, read numerals, no );
+	table process			( __ toc __, [Section Nr] -= 'B ' );
+
+	table insert above selected rows( __ toc __, [Book] != [Book,row()-1] );
+	table process selected rows	( __ toc __, [Section Name]=='', [Section Name]=[Book,row()+1]; [Level] = 0; );
+
+	// Build up a TOC hierarchy.
+
+	Books[] = "";		
+	table process selected rows 	( __ toc __, ([Section Nr]{} == 1) | ([Section Nr]{1}=='.'), [Section Nr] = ' '+[Section Nr]);
+	table process 			( __ toc __, [Section Nr] = replace all( [Section Nr], '.0', '. ' ) );
+
+	for all table rows		( __ toc __, Level ) if ([Section Nr]<>'')
+	{
+	    lvl[]		= {[Book]} + tokenize( [Section Nr], {include blanks}, '.' );
+	    Books[lvl[]] 	= [Section Name];
+	    Books[{[Book]}]	= ''; // Keep blank
+	}
+
+	rv[] 			= variable view( Books[], "[F1]: Help;  [Space]: Open to read; [Enter]: Open to read and exit; [Escape]: Exit -> ", new line + escape, 
+				  {wrap, alt screen, select no headers, 2 columns}, row[], col[], __ open HTML from variable callback function __, ' '+new line  );
+
+
+	runtime settings[verbose] = saved[];
+    }
+}
+
+
+
 } // once ()
+
 

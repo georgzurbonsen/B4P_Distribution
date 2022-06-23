@@ -1,0 +1,990 @@
+	
+// B4P Installation Script
+
+// Revision History
+//
+// 1.00		08.01.2018	Legacy versions ...
+// 4.00		08.08.2020	Updated for B4P 7.05 - New directory paths, command path included
+// 8.00		08.11.2020	Updated for B4P 8.00
+// 8.01		12.11.2020	Included the My B4P Init.b4p file
+// 8.02		23.11.2020	Fixed desktop issue up
+// 8.32		16.02.2021	Added further DLL file, and themes
+// 8.40		09.03.2021	Batch mode installation
+// 8.41		14.03.2021	Shows version verification
+// 9.00		03.01.2022	Updated
+// 10.00	21.03.2022	Adapted for Release 10.0
+
+version[] = "10.00 2022-03-21 (Windows)";
+runtime settings[verbose] = quiet;
+
+$$ activation code = CB 7D 84 9A  4C 32 42 33  D7 F9 3D 80  BC EC C1 41  73 80 9A B8;
+
+//	Valid activation code is required to run this installation script.  Activation code will be void if this script is modified.
+
+
+define procedure and function( get long options, {{ valid option names, to parameters members to string}}, 0, 1 )
+{
+    if (existing( long options[] )) if (identify( long options[] )=='array') delete members( long options[] ); // Delete members if array
+    local
+    {
+	count[]= 0;
+	arg[]= '';
+    }	   
+    for all variables( command line arguments[], arg[] )
+    {
+	if (arg[] = '--*')
+	{
+	    arg[] -= '--';
+	    if (parameter count[] >= 1) if ( find( valid option names[], left( arg[], "=") ) < 0 )
+	    {
+	        throw( compose("Function 'get long options': long option '--", arg[], "' in the command line is not valid.") );
+	    }
+	    count[]++;
+	    global() long options[left( arg[], '=' )] = select if( (arg[] = '*=*'), best type(right( arg[], "=" )), null() );
+	}
+    }
+    return( count[] );
+}
+
+
+
+{
+
+	echo(new line, "B4P installation program ", version[], " is starting ... ");
+
+	slash[] 			= system info[directory separator]; // '\' for Windows, '/' for UNIX environments
+	dir[installation image] 	= working directory() + slash[];
+	principal b4p folder name[] 	= "B4P";
+
+	user settings file[]		= "B4P User Settings.json";
+	locale settings file[]		= "B4P Locale Settings.json";
+	license file[]			= "B4P License File.json";
+	identification file[]		= "B4P Identification File.json";
+
+	table initialize( menu,
+	{ 	{ Choices,	Explanations, 						Selections 	},
+		{ M,		'Do Machine installation for all users',       		M 		},
+		{ U,		'Do User installation (your user name only)', 		U 		},
+		{ D,		'De-install B4P', 					D 		},
+		{ I,		'Do Identification for acquiring a license',		I 		},
+		{ E,		'Exit installer without actions',			E 		}  
+	} );
+
+
+	get long options( { help, choice, 'keep-user-settings', 'keep-my-init', 'keep-my-themes', license, locale, 'create-shortcuts','create-personal-folder' } );
+
+
+	//
+	// Assistance
+	//
+
+	if (existing( long options[help] ))
+	{
+	    echo("Syntax: setup");
+	    echo("        setup [long options]");
+	    echo;
+	    echo("        All long options begin with two consecutive minus signs.");
+	    echo("        The options may be arranged in any order.  Where applicable,");
+	    echo("        add option value after '=' without spaces around them.");
+	    echo("        Option values like file names may be put into quotation marks.");
+	    echo;
+	    echo("        --help                   Shows this help. No installation started");
+	    echo;
+	    echo("        --choice=machine         Do machine installation for all users");
+	    echo("                 user            Do user installation");
+	    echo("                 deinstall       Do de-installation");
+	    echo("                 info            Provide info for license generation");
+	    echo("                 exit            No actions.");
+	    echo("        Note: Using '--choice' will run installation in batch mode entirely");
+	    echo("        Note: Must also provide locale info at the first installation");
+	    echo;
+	    echo("        --keep-user-settings     Keep user settings from previous installation");
+	    echo("        --keep-my-init           Keep own 'My B4P Init.b4p' file");
+	    echo("        --keep-my-themes         Keep own 'B4P Style Themes.xlsx' file");
+	    echo("        --create-shortcuts       Create shortcuts on desktop");
+	    echo("        --create-personal-folder Create personal folder for B4P programs");
+	    echo;
+	    echo("        --license=keep           Keep license from previous installation");
+	    echo("                 =new            Use new license provided in install. directory");
+	    echo("                 =no             Apply no license. B4P runs in demo mode");
+	    echo("                 ="Filename.json" Specify path and name of license file to use");
+	    echo;
+	    echo("        --locale=keep            Keep existing locale settings");
+	    echo("                 xx_YY           Language/Country designation, e.g. 'en_US'");
+	    echo("          Specified locales are not case sensitive, hypen or underscore OK");
+	    echo("          Use locale info as use with Excel to match number and date formats");
+	    echo("          as well as list separators (commas or semicoons).");
+	    echo;
+	    echo;
+	    echo("Example:  setup --choice=machine --locale=en_US");
+	    echo;
+	    echo("Note:     Elevated user privileges are requierd (e.g. Windows administrator)");
+	    echo;
+	    exit;
+	}
+
+
+	//
+	// Check privileges
+	//
+
+	echo(new line, "1 >> Check the B4P privileges to run installation program ...", new line);
+
+	if (script privileges() <> installer, administrator )  throw( "Insufficient B4P execution privileges.  Check activation code." );
+	if (system info[privileges] <> elevated,administrator) throw( "Insufficient system privileges (e.g. admin rights) to install B4P on your system." );
+
+
+	//
+	// Installation Option, either using main menu or batch
+	//
+
+	echo(new line, "2 >> Installation program - Main Menu ...", new line);
+
+	if (existing and valid(long options[choice]))
+	{
+	    batch[] = true;
+	    runtime settings[exit directly] = true;
+	    available choices[] = { machine, user, deinstall, info, exit }; // Note: 'user' choice applies for windows only.
+	    if ( find( available choices[], long options[choice]) < 0 )
+	    {
+		throw( compose( "Encountered invalid value assigned to long option '--choice': ", long options[choice], new line, "    Valid choices are: ", join(available choices[],", "), "." ) );
+	    }
+	    echo("    Recognized command line long option: --choice=", long options[choice] );
+	    choice[] = +long options[choice]{0}; // M for machine, U for user and D for de-install (1st character moved to upper case
+	}
+	else
+	{
+	    batch[] = false;
+	    choice[] = table menu quick( menu, Choices, Explanations, Selections );
+	}
+
+	if (choice[] = E) exit;
+
+	if ( (choice[] = D) & !batch[] )
+	{
+	    reply[] = input quick ignore case(new line + "    A t t e n t i o n" + new line + "    Are you sure you want to de-install B4P? ", NY );
+	    if (reply[]<>Y) throw(exit);
+	}
+
+	if (choice[] = I)
+	{
+		echo		(new line, "    Getting system identfication for license generation ..." );
+		id[] 		= license provide identification();
+
+		if (batch[])
+		{
+		    holder[] = system info[user name];
+		}
+		else
+		{
+		    echo	(new line, "    Specify a personal name and/or company name as license holder name");
+		    holder[] 	= input(   "    Enter the name: ", string );
+		}
+		attribute write( ".", identification file[], Holder, holder[] );
+		attribute write( ".", identification file[], Identification, id[] );
+		attribute write( ".", identification file[], Timestamp, str(date(now),"YYYY-MM-DD HH:II:SS") );
+
+		echo		(new line, "    The identification info is stored in this file: ", identification file[] );
+		echo		("    --> Please send this .JSON file out by mail in order to receive the license key.");
+		echo( new line, "Done", new line, new line );
+		throw(exit);
+
+	}
+
+
+
+	//
+	// Check if all files needed for installation are available
+	//
+
+	if (choice[] <> D)
+	{
+		echo(new line, "3 >> Check that all required files are available for installation ...", new line );
+
+		required files [DLL]			= "vcruntime140.dll";
+		required files [DLL2]			= "vcruntime140_1.dll";
+
+		required files [Program]		= "B4P.exe";
+		required files [Icon]			= "b4picon.ico";
+		required files [Locales List]		= "List of Locales.csv";
+		required files [Style Themes]		= "B4P Style Themes.xlsx";
+		required files [Manual]			= "B4P Reference Manual.b4p";
+		required files [Setup] 			= "Setup.exe";
+		required files [Install Script]		= "Install.txt";
+
+		required direct[lib]			= "lib";
+		required direct[weblib]			= "weblib";
+
+	
+		for all variables( required files[], file[] )	
+		{
+		    echo("    Check file ", file[] );
+		    if (!file existing ( dir[installation image] + file[])) throw( "Following required file is missing: " + file[] );
+		}
+
+		for all variables( required direct[], direct[] )	
+		{
+		    echo("    Check directory ", direct[] );
+		    if (!directory existing ( dir[installation image] + direct[])) throw( "Following required file is missing: " + direct[] );
+		}
+	}
+
+
+
+	//
+	// Identify location of program files and check if folder is existing
+	//
+
+	echo(new line, "4 >> Identify locations for the program files ...", new line);
+
+	dir[local machine program files]	= system info[program directory];
+	dir[current user program files]		= system info[user app data directory ];
+
+	if (dir[local machine program files]='*(x86)*') // For 32 bit installations
+	{
+		dir[other local machine program files] = dir[local machine program files] - ' (x86)'; // This is 64 bit directory (remove suffix)
+	}
+	else
+	{
+		dir[other local machine program files] = dir[local machine program files] + ' (x86)'; // This is 32 bit directory (add suffix)
+	}
+	dir[other local machine program files] += slash[] + principal b4p folder name[];
+
+	dir[program files] 			= select if( choice[]==M, dir[local machine program files], dir[current user program files] );
+	dir[current user profile] 		= system info[ user directory ];	
+	dir[program files b4p]			= dir[program files] + slash[] + principal b4p folder name[];
+
+	echo("    Identified following directories:", new line);
+	echo("    Directory for local  machine  installation: ", dir[local machine program files]);
+	echo("    Directory for  current  user  installation: ", dir[current user program files]);
+	echo("    Using following directory for installation: ", dir[program files]);
+
+
+
+	//
+	// Check for existing user, locale and license settings.
+	//
+
+	echo(new line, "5 >> Check for existing user, local, license and themes setting ...", new line);
+
+	if (choice[] <> D) // All choices except de-installation
+	{
+	    user settings directory[]		= system info[user app data directory b4p];
+	    user settings file name[]   	= system info[user app data directory b4p] + slash[] + user settings file[];
+	    user settings   existing[] 		= file existing( user settings file name[]   );
+
+	    b4p style themes file name[]	= system info[user app data directory b4p] + slash[] + "B4P Style Themes.xlsx";
+	    b4p style themes file existing[]	= file existing( b4p style themes file name[] );
+
+	    my b4p init file name[]		= system info[user app data directory b4p] + slash[] + "My B4P Init.b4p";
+	    my b4p init file existing[]		= file existing( my b4p init file name[] );
+
+	    locale settings file name[] 	= system info[user app data directory b4p] + slash[] + locale settings file[];
+	    locale settings existing[] 		= file existing( locale settings file name[] );
+
+	    locale settings existing[] 		= file existing( locale settings file name[] );
+
+	    license directory[]			= system info[app data directory b4p];
+	    license file name[]         	= system info[app data directory b4p] 	  + slash[] + license file[];
+	    license file existing[] 		= file existing( license file name[]         );
+	    if (license file existing[] = false)
+	    {
+		license directory[]		= system info[user app data directory b4p];
+		license file name[]         	= system info[user app data directory b4p]  + slash[] + license file[];
+		license file existing[] 	= file existing( license file name[]         );
+	    }
+
+	    echo(new line, "    Found following settings files:", new line);
+	    echo("    User   settings :  ", select if ( user settings existing[]   ,      "Yes: " + user   settings file name[] , "No." ));
+	    echo("    Locale settings :  ", select if ( locale settings existing[] ,      "Yes: " + locale settings file name[] , "No." ));
+	    echo("    License file    :  ", select if ( license file existing[]    ,      "Yes: " + license file name[]         , "No." ));
+	    echo("    My B4P init file:  ", select if ( my b4p init file existing[],      "Yes: " + my b4p init file name[]     , "No." ));
+	    echo("    B4P Style Themes:  ", select if ( b4p style themes file existing[], "Yes: " + b4p style themes file name[], "No." ));
+
+
+	    if (user settings existing[])
+	    {
+		echo(new line, "    The existing user settings file contains starting directory name,");
+		echo(          "    user defined prompt, and other user specific data.", new line);
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-user-settings'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the user settings file from the previous installation ?", NY);
+		}
+		if (reply[]=N) 
+		{
+		    echo("    Using new user settings.");
+		    file delete( user settings file name[] );
+		    user settings existing[] = false;
+		}
+		else
+		{
+		    echo("    Keeping existing user settings.");
+		}
+	    }
+
+
+	    if (locale settings existing[])
+	    {
+		echo(new line, "    The locale settings file contains language and country specific" );
+		echo(          "    number and date formats.", new line);
+
+		reply[] = pick if existing and valid(long options[locale], '' );
+		if (batch[])
+		{
+		    if (reply[]='') reply[] = keep;
+		}
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep these locale settings  ?", "NY");
+		}
+		else
+		{
+		    if (reply[]=keep) // --locale=keep
+		    {
+			reply[] = Y;		
+		    }
+		    else
+		    {
+			reply[] = N;
+		    }
+		}
+
+		if (reply[]=N) 
+		{
+		    echo("    Using new locale settings.");
+		    file delete( locale settings file name[] );
+		    locale settings existing[] = false;
+		}
+	    }
+
+
+	    if (my b4p init file existing[])
+	    {
+		echo(new line, "    The file 'My B4P Init File.b4p' contains your personalized B4P,");
+		echo(          "    initialization program.", new line);
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-my-init'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the this file from the previous installation ?", NY);
+		}
+		if (reply[]=N) 
+		{
+		    echo("    Using new 'My B4P Init File.b4p'.");
+		    file delete( my b4p init file name[] );
+		    my b4p init file existing[] = false;
+		}
+		else
+		{
+		    echo("    Keeping existing 'My B4P Init File.b4p' for the new installation.");
+		}
+	    }
+
+
+	    if (b4p style themes file existing[])
+	    {
+		echo(new line, "    The file 'My Style Themes.xlsx' (Excel file) contains all themes which,");
+		echo(          "    can be used with the function 'table style themes(...)' to format tables.", new line);
+
+		reply[]= select if( batch[], N, '');
+		if (existing(long options['keep-my-themes'])) reply[] = Y;
+
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep this file (No: A new theme file will be introduced) ?", "NY");
+		}
+		if (reply[]=N) 
+		{
+		    echo("    Using new style themes.");
+		    file delete( b4p style themes file name[] );
+		    b4p style themes file name[] = false;
+		}
+		else
+		{
+		    echo("    Keeping existing themes file for the new installation.");
+		}
+	    }
+
+
+	    if (directory existing( user settings directory[] ))
+	    {
+		file copy multiple overwrite all(  user settings directory[], ".", "*.json" );  // Copy all settings file to local installation directory
+		file copy multiple overwrite all(  user settings directory[], ".", "My B4P Init.b4p" ); // and rescue the personalized "My B4P Init.b4p" file.
+		file copy multiple overwrite all(  user settings directory[], ".", "B4P Style Themes.xlsx" ); // and rescue the personalized B4P file
+	    }
+
+
+	    if (license file existing[])
+	    {
+		attribute read( left last match( license file name[], slash[] ), license file[], Holder, license[Holder] );
+		attribute read( left last match( license file name[], slash[] ), license file[], Key, license[Key] );
+
+		echo(new line, "    The license file contains the authentication info to run B4P with given license rights.");
+		echo(          "    With few exceptions, the license file continues to be valid for the next release.", new line);
+		echo(          "    License holder: ", license[Holder], new line );
+
+		reply[] = pick if existing and valid(long options['license'], '' );
+		if (reply[] == keep)		reply[] = Y;
+		else: if (reply[] !='')		reply[] = N; // Anything else but keep
+		if (batch[] & reply[] = '')	reply[] = N;
+		if (reply[]='')
+		{
+		    reply[] = input quick ignore case("    Do you want to keep the license file from the previous installation ?", "NY");
+		}
+		if (reply[]=N) 
+		{
+		    echo("    Old license file will be discarded.");
+		    license file existing[] = false;
+		    delete(license[Key], license[Holder]);
+		}
+		else
+		{
+		    echo("    Old license file will be kept.");
+		    file copy multiple overwrite all( license directory[], ".", license file[] ); // Keep license file as new location may be different
+		}
+	    }
+	}
+
+
+	// After rescuing the user settings files
+	{
+	    echo(new line, "6 >> Deleting B4P program and application data subdirectories (if existing) ...", new line);
+	
+	    for all parameters( { system info[user app data directory b4p],system info[app data directory b4p],system info[program directory b4p],dir[other local machine program files] }, dir[] )
+	    {
+		if (directory existing( dir[] ))
+		{
+			directory delete recursive( dir[] );
+			echo("    Deleted: ", dir[] );
+		}
+
+		dir[] = replace all( dir[], "B4P", "Beyond4P" ); // Remove legacy directories
+		if (directory existing( dir[] ))
+		{
+			directory delete recursive( dir[] );
+			echo("    Deleted: ", dir[] );
+		}
+
+	    }
+	    echo("    Done.");
+	}
+
+
+	//
+	// Identify paths to desktop and start menus
+	//
+
+	
+	echo(new line, "7 >> Windows - Identify desktop and start menu locations ...", new line);
+
+	rv[] = registry read value( HKEY_LOCAL_MACHINE, SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders, Common Programs, dir[local machine start menu] );
+	if (rv[] != OK) dir[local machine start menu] = "";
+	echo("    Local machine start menu path: ", dir[local machine start menu]);
+
+	rv[] = registry read value( HKEY_LOCAL_MACHINE, SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders, Common Desktop, dir[local machine desktop] );
+	if (rv[] != OK) dir[local machine desktop] = "";
+	echo("    Local machine desktop    path: ", dir[local machine desktop]);
+
+	rv[] = registry read value( HKEY_USERS, .DEFAULT\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders, Programs, dir[current user start menu] );
+	if (rv[] != OK) dir[current user start menu] = "";
+	substitute( dir[current user start menu], "%USERPROFILE%",  dir[current user profile] );
+	echo("    Current user start menu  path: ", dir[current user start menu]);
+
+	rv[] = registry read value( HKEY_USERS, .DEFAULT\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders, Desktop, dir[current user desktop] );
+	if (rv[] != OK) [current user dekstop] = "";
+	substitute( dir[current user desktop], "%USERPROFILE%",  dir[current user profile] );
+	echo("    Current user desktop     path: ", dir[current user desktop]);
+
+
+
+	//
+	// Remove all B4P related files from start menu and desktop
+	//
+
+	
+	echo(new line, "8 >> Windows - Delete old contents in desktop and start menu locations ...", new line);
+
+	for all parameters( {dir[local machine start menu], dir[current user start menu]}, dir[] ) if (dir[] != "")
+	{
+		count[] = directory delete recursive all( dir[] + slash[] + principal b4p folder name[] );
+		echo("    ", count[], " files deleted in ", dir[] );
+
+		count[] = directory delete recursive all( replace all( dir[] + slash[] + principal b4p folder name[], "B4P", "Beyond4P")  );
+		echo("    ", count[], " files deleted in ", dir[], " (legacy locations)" );
+	}
+
+	for all parameters( {dir[local machine desktop], dir[current user desktop]}, dir[] ) if (dir[] != "")
+	{
+		count[]  = file delete multiple all( dir[], {"B4P.LNK", "B4p Manual.LNK", "Beyond4P.LNK" } );
+		echo("    ", count[], " files deleted in ", dir[] );
+	}
+
+	//
+	// Detach the registry settings for filetype ".b4p".
+	//
+
+	echo(new line, "9 >> Windows - Delete old registry settings (e.g. assignment of file extension) ...");
+
+	registry delete tree silently( HKEY_LOCAL_MACHINE, "Software", "Beyond4P" ); // Legacy cleanup
+	registry delete tree silently( HKEY_CURRENT_USER,  "Software", "Beyond4P" ); // Legacy cleanup
+	registry delete tree silently( HKEY_LOCAL_MACHINE, "Software", "B4P" );
+	registry delete tree silently( HKEY_CURRENT_USER,  "Software", "B4P" );
+
+	registry delete key  silently( HKEY_CLASSES_ROOT, "", ".b4p" );
+
+	registry delete tree silently( HKEY_CLASSES_ROOT, "", "Beyond4P_ext" ); // Legacycleanup
+	registry delete tree silently( HKEY_CLASSES_ROOT, "", "B4P_ext" );
+
+	//
+	// Remove the paths
+	//
+
+	machine path[] = '';
+	user path[] = '';
+
+	rv[] = registry read value silently ( HKEY_LOCAL_MACHINE, "SYSTEM\CurrentControlSet\Control\Session Manager\Environment", Path, machine path[] );
+	if (rv[] == OK)
+	{
+		machine path[] -= ";" + dir[local machine program files] + slash[] + principal b4p folder name[]; // Remove old B4P path if existing
+		machine path[] -=       dir[local machine program files] + slash[] + principal b4p folder name[]; // Remove old B4P path if existing (in case at beginning
+		if (machine path[]{0}=';') machine path[] -= ';';
+		registry write value silently ( HKEY_LOCAL_MACHINE, "SYSTEM\CurrentControlSet\Control\Session Manager\Environment", Path, machine path[], REG_SZ );
+	}
+
+	rv[] = registry read value silently ( HKEY_CURRENT_USER, "Environment", Path, user path[] );
+	if (rv[] == OK)
+	{
+		user path[] -= ";" + dir[current user program files] + slash[] + principal b4p folder name[]; // Remove old B4P path if existing
+		user path[] -=       dir[current user program files] + slash[] + principal b4p folder name[]; // Remove old B4P path if existing at beginning or alone
+		user path[] -= ";" + "%USERPROFILE%\AppData\Local"   + slash[] + principal b4p folder name[]; // Remove old B4P path if existing
+		user path[] -=       "%USERPROFILE%\AppData\Local"   + slash[] + principal b4p folder name[]; // Remove old B4P path if existing at beginning or alone
+		if (user path[]{0}=';') user path[] -= ';';
+		registry write value silently ( HKEY_CURRENT_USER, "Environment", Path, user path[], REG_SZ );
+	}
+
+
+	if (choice[] = D)
+	{
+		echo(new line, "De-Installation completed.", new line);
+		throw(exit);
+	}
+
+
+	//
+	// Create the new folder incl. libraries folder
+	//
+
+	echo(new line, "10 >> Create new folders for B4P program ...", new line);
+
+	rv[] = directory create silently( dir[program files b4p] );
+
+	if (rv[] =+ "Directory access denied")
+	{
+		if (batch[]) throw("Installation stopped due to access restrictions creating '" + dir[program files b4p] + "'" );
+
+		answer[] = input quick ignore case(new line + "Restrictions apply to local machine installation. Install for current user (Y/N)? ", NY );
+		if (answer[] = N) throw("Installation process stopped by user");
+		choice[] = U;
+		dir[program files] = dir[current user program files];
+		working directory( dir[program files] );
+		rv[] = directory create silently( principal b4p folder name[] );
+	}
+	if (rv[] != OK) throw("Installation aborted due to following error: " + rv[]);
+
+	rv[] = directory create silently( dir[program files b4p] + slash[] + "lib" );
+
+
+	//
+	// Copy the contents (Program, DLL file, libraries, etc.) 
+	//
+
+	echo(new line, "11 >> Copy all files to destination directory '", dir[program files b4p] , " ...", new line);
+
+	for all variables( required files[], file[] )
+	{
+		echo("    ", file[] );
+		file copy(  dir[installation image] + file[], dir[program files b4p]  + slash[] + file[] );
+	}
+
+	for all variables( required direct[], direct[] )
+	{
+		echo("    ", direct[] );
+		file copy recursive(  dir[installation image] + direct[], dir[program files b4p]  + slash[] + direct[] );
+	}
+
+
+	//
+	// Restore user settings and locale settings
+	//
+
+	echo(new line, "12 >> Restore user settings (where available) ..." , new line);
+
+	if ( file existing( user settings file[] )  )
+	{
+	    echo("    Found: ", user settings file[] );
+	    rv[] = directory create silently( user settings directory[] );
+	    if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
+
+	    file copy multiple overwrite all(  ".", user settings directory[], user settings file[] ); 
+	    file delete ( user settings file[] );
+	}
+	else
+	{
+		    echo("    User settings file: skipped.", new line);
+	}
+
+
+	file copy multiple overwrite all(  ".", user settings directory[], "My B4P Init.b4p" ); 
+	file copy multiple overwrite all(  ".", user settings directory[], "B4P Style Themes.xlsx" ); 
+
+
+
+	echo(new line, "13 >> Define locale settings ..." , new line);
+
+	table load( loc, "List of Locales.csv" );
+	table keep columns( loc, {Locale, Language, Country } );
+	table delete blank rows( loc );
+	table insert columns( loc, Choice, "", 0);
+
+	locale provided as option[] = select if existing and valid( long options[locale], '' );
+
+	if (locale provided as option[] <> '',keep)
+	{
+	    substitute all( locale provided as option[], '-', '_' ); // Use underscore
+	    locale[] = '';
+	    table process selected rows( loc, (locale provided as option[] =+ [Locale]), locale[] = [Locale] );
+	    if (locale[] == '') throw( "Locale info '" + long options[locale] + "' provided with '--locale' is not supported.");
+	    echo("    Locale chosen: ", locale[], " / ", [loc:Locale,locale[],Language]," in ",[loc:Locale,locale[],Country],"." );
+	    set locale( locale[], "List of Locales.csv" );
+	    echo("    Done setting locale.");
+	}
+	else
+	{
+	    if ( file existing( locale settings file[] )  )
+	    {
+		echo("    Found: ", locale settings file[] );
+		rv[] = directory create silently( user settings directory[] );
+		if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
+
+		file copy multiple overwrite all(  ".", user settings directory[], locale settings file[] ); 
+	        file delete ( locale settings file[] );
+	    }
+	    else
+	    {
+
+		echo("    No locale settings have been defined yet.");
+
+		table copy table( loc, loc1 );
+		table consolidate( loc1, Language );
+		table process( loc1, [Choice] = chr( row()+64 ) );
+		echo(new line,"    Step 1 - Choose language:");
+		lang[] = table menu quick( loc1, Choice, Language, Language );
+
+		table copy table( loc, loc1 );
+		table keep selected rows( loc1, [Language]=lang[] );
+		table process( loc1, [Choice] = chr( row()+64 ) );
+		echo(new line,"    Step 2 - Choose country:");
+		locale[] = table menu quick( loc1, Choice, Country, Locale );
+
+	    	echo("    Locale chosen: ", locale[], " ( ", [loc:Locale,locale[],Language]," / ",[loc:Locale,locale[],Country],"." );
+
+		set locale( locale[], "List of Locales.csv" );
+		echo("    Done setting locale.");
+	    }
+	}
+
+
+	//
+	// Add B4P on the desktop
+	//
+
+	echo(new line, "14 >> Windows - Adding B4P shortcut on the desktop ..." , new line);
+
+	echo(new line, "    The installer wants to place two shortcut icons (one for the B4P engine,");
+	echo(          "    and the other for accessing the online documentation) onto the desktop.", new line);
+
+	reply[]= select if( batch[], N, '');
+	if (existing(long options['create-shortcuts'])) reply[] = Y;
+
+	if (reply[]='')
+	{
+	    reply[] = input quick ignore case( new line + "    Do you want to create shortcuts on the desktop ? ", NY);
+	}
+
+	if (reply[]=Y)
+	{
+	    echo("    Create the shortcuts on the desktop ...");
+	    dir[desktop] = select if( choice[]==M, dir[local machine desktop], dir[current user desktop] );
+	    file create link( dir[desktop] + slash[] + "B4P.LNK"       , dir[program files b4p] + slash[] + required files[Program] );
+	    file create link( dir[desktop] + slash[] + "B4P Manual.LNK", dir[program files b4p] + slash[] + required files[Manual] );
+	}
+	else
+	{
+	    echo("    No shortcuts will be create on the desktop.");
+	}
+
+	//
+	// Add B4P in the start menu
+	//
+
+	echo(new line, "15 >> Adding B4P shortcut in the main menu ..." , new line);
+
+	dir[start menu b4p] = select if( choice[]==M, dir[local machine start menu], dir[current user start menu] ) + slash[] + principal b4p folder name[];
+	directory create( dir[start menu b4p] );
+	file create link( dir[start menu b4p] + slash[] + "B4P.LNK",        dir[program files b4p] + slash[] + required files[Program] );
+	file create link( dir[start menu b4p] + slash[] + "B4P Manual.LNK", dir[program files b4p] + slash[] + required files[Manual] );
+
+
+	//
+	// Assign filetype ".b4p" to B4P program (starting) and Notepad (editing).
+	//
+
+	echo(new line, "16.1 >> Windows - Assign file type '.b4p' to B4P (start) and Editor (edit) and to an icon ..." , new line);
+
+
+	// Construction of registry settings
+	//
+	// HKEY_CLASSES_ROOT
+	//	.bp4				(Standard) 	= B4P_ext (REG_SZ)
+	//
+	//	B4P_ext\DefaultIcon		(Standard) 	= ...Full path to icon file... No quotation marks
+	//	B4P_ext\Shell\Edit\Command	(Stanadrd) 	= "Notepad" %1			Only Notepad in quotation marks
+	//	B4P_ext\Shell\Open\Command	(Standard) 	= "..Path in quotation marks" "%1"	Both program and %1 in quotation marks
+	//
+	// HKEY_CURRENT_USER
+	//	Software\B4P		Program Location 	= Path where installed B4P program is located (user installation)
+	//				Starting Directory	= If specifified by user, location of starting directory
+	//	Software\B4P\License	Key			= Key		(If B4P is installed for current user only)
+	//	Software\B4P\License	Holder			= Holder Name
+	//
+	// HKEY_LOCAL_MACHINE
+	//	Software\B4P		Program Location 	= Path where installed B4P program is located (machine installation)
+	//	Software\B4P\License	Key			= Key		(If B4P is installed for all users on local machine)
+	//	Software\B4P\License	Holder			= Holder Name
+	//
+
+	registry create key  ( HKEY_CLASSES_ROOT, ".b4p" );
+	registry write value ( HKEY_CLASSES_ROOT, ".b4p", "", "B4P_ext", REG_SZ );
+
+	registry create key  ( HKEY_CLASSES_ROOT, "B4P_ext" );
+	registry write value ( HKEY_CLASSES_ROOT, "B4P_ext", "", "B4P Program", REG_SZ );
+
+	registry create key  ( HKEY_CLASSES_ROOT, "B4P_ext\DefaultIcon" );
+	registry write value ( HKEY_CLASSES_ROOT, "B4P_ext\DefaultIcon", "", dir[program files] + slash[] + principal b4p folder name[] + slash[] + required files[Icon], REG_SZ );
+
+	registry create key  ( HKEY_CLASSES_ROOT, "B4P_ext\Shell\Edit\Command" );
+	registry write value ( HKEY_CLASSES_ROOT, "B4P_ext\Shell\Edit\Command", "", '"Notepad" %1', REG_SZ );
+
+	registry create key  ( HKEY_CLASSES_ROOT, "B4P_ext\Shell\Open\Command" );
+	registry write value ( HKEY_CLASSES_ROOT, "B4P_ext\Shell\Open\Command", "", '"' + dir[program files] + slash[] + principal b4p folder name[] + slash[] + required files[Program] + '" "%1"', REG_SZ );
+
+
+
+	echo(new line, "16.2 >> Windows - Include B4P in path environment variable." , new line);
+
+	if (choice[]==M) // Machine installation
+	{
+		registry create key silently  ( HKEY_LOCAL_MACHINE, "Software\B4P" );
+		registry create key silently  ( HKEY_CURRENT_USER,  "Software\B4P" );
+		registry write value ( HKEY_LOCAL_MACHINE, "Software\B4P", "Program Location", dir[program files] + slash[] + principal b4p folder name[], REG_SZ );
+	}
+	else
+	{
+		registry create key silently ( HKEY_CURRENT_USER,  "Software\B4P" );
+		registry write value ( HKEY_CURRENT_USER,  "Software\B4P", "Program Location", dir[program files] + slash[] + principal b4p folder name[], REG_SZ );
+	}
+
+
+	if (choice[] == 'M')
+	{
+		if (right(machine path[],1) != ";") machine path[] += ";";
+		machine path[] += dir[program files b4p];
+		registry write value ( HKEY_LOCAL_MACHINE, "SYSTEM\CurrentControlSet\Control\Session Manager\Environment", Path, machine path[], REG_SZ );
+	}
+	else // User installation
+	{
+		if (right(user path[],1) != ";") user path[] += ";";
+
+		user path[] +=  "%USERPROFILE%\AppData\Local" + slash[] + principal b4p folder name[];
+		registry write value ( HKEY_CURRENT_USER, "Environment", Path, user path[], REG_SZ );
+	}
+
+
+	//
+	// Set the license info if existing
+	//
+
+
+	echo(new line, "17 >> License activation ..." , new line);
+
+	reply[] = pick if existing and valid(long options['license'], '' );
+	if (batch[] & reply[] = '') reply[] = new; // Default: 
+
+	switch( reply[] )
+	{
+	    case (no)
+	    {
+		echo("    No license will be applied. B4P will run in demo mode.");
+		file delete silently( license file name[] );
+	    }
+	
+	    case (new,keep)
+	    {
+		echo("    The existing or preserved license file will be used.");
+		if (file existing( license file[]) = false) 
+		    throw("'B4P License File.json' is missing in the installation directory");
+		variable load( license[], license file[] );
+		rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+
+		if (rv[] == OK)
+		{
+			echo("    License key has been accepted.", new line, "    Holder: ", license[Holder]);
+		}
+		else:	throw("License not accepted - " + rv[]);
+	    }
+
+	    case( +'*.json' ) // License file, plus sign means ignore case
+	    {
+		echo("    A license file name has been specified: ", reply[]);
+		license[path name] = reply[];
+		if (!file existing( license[path name] ))
+		{
+		    throw("License file name provided as command option not found: "+ license[path name] );
+		}
+
+		variable load( license[], license[path name] );
+		rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+		if (rv[]=="OK")
+		{
+			echo("    License accepted.  Thank you.  Holder is ", license[Holder]);
+		}
+		else:	throw("License not accepted - " + rv[]);
+	    }
+
+	    case ('')
+	    {
+
+		if (existing(license[Key]))
+		{
+			echo("    A license key is available or has been preserved");
+			echo("    from the previous installation.");
+
+			rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+			if (rv[]=="OK")
+			{
+				echo("    License key has been accepted.", new line, "    Holder: ", license[Holder]);
+			}
+			else:	throw("License not accepted - " + rv[]);
+		}
+		else: if (file existing(license file[]))
+		{
+			echo("    A license file is already provided in this installation package and will be used.");
+
+			rv[] = directory create silently( license directory[] );
+			if (rv[] <> 'OK','Directory already existing') throw("Installation aborted due to following error: " + rv[]);
+			file copy multiple overwrite all( ".", license directory[], license file[] ); 
+		}
+		else // No license info taken over
+		{
+
+		    echo(new line, "License activation ...", new line );
+		    echo("    Specify the license file (typically called 'B4P Licsense File.json'), or" );
+		    echo("    press [Enter] to skip this and run B4P for free, where some restrictions apply." );
+	
+		    rv[] = '';
+		    do
+		    {
+			license[path name] = input("    Enter path + file name or press [Enter] to skip" + new line + "    --> ", string );
+			if (license[path name]=='')
+			{
+			    echo("    Nothing entered.  B4P will be activated in demo mode.");
+			    break loop;
+			}
+
+			if (!file existing( license[path name] ))
+			{
+			    echo(new line, "    Directory or file not found. Please retry." );
+			    continue loop;
+			}
+
+			variable load( license[], license[path name] );
+
+			rv[] = license apply key( license[Key], license[Holder], choice[]==M );
+			if (rv[]=="OK")
+			{
+				echo("    License accepted.  Thank you.  Holder is ", license[Holder]);
+			}
+			else:	echo("    ", rv[], "  Please retry.");
+		    }
+		    while(rv[]<>"OK");
+		}
+	    }
+	    else:
+	    {
+		throw("The value '" + reply[] + "'provided with the command option '--license' is not supported." );
+	    }
+	}
+
+
+	my program directory[] = dir[current user profile] + slash[] + "Documents" + slash[] + "Programs" + slash[] + principal b4p folder name[];
+
+
+	echo(new line, "18 >> Opion: Creating a personal folder ..." , new line);
+
+	reply[]= select if( batch[], N, '');
+	if (existing(long options['create-personal-folder'])) reply[] = Y;
+
+	if (reply[]='')
+	{
+	    reply[] = input quick ignore case(new line + "    Do you want to create a personal B4P program folder ? ", NY );
+	}
+
+	if (reply[] = Y)
+	{
+	    echo("    Creating personal folder: ", my program directory[] );
+	    echo("    Note: If directory or files already exist, then these files will not be overwritten." );
+
+	    rv[] 			= directory create silently( my program directory[] );
+	    if 				(rv[] <> 'OK','Directory already existing') throw("Unable to create this directory: " + rv[]);
+	    file copy multiple all	( ".", my program directory[], {main.b4p, hello world.b4p, start B4P here.b4p, interactive.b4p} );
+	    starting directory		( my program directory[] );
+
+	    echo(new line, "    Done creating this directory.");
+	    echo(          "    When you start B4P from start menu or desktop without file specified");
+	    echo(          "    then 'main.b4p' in this directory will be started.");
+	}
+	else: echo("    A new personal folder will not be created.");
+
+
+	echo(new line, "19 >> Define locale settings ..." , new line);
+
+
+	echo;
+	echo(new line,  ">>  Congratulations! Installation has been completed.");
+	echo(new line,  "    Highly advisable to restart your machine so all configuration settings for this installation are in effect.", new line, new line );
+
+	catch( msg[] )
+	{
+	    if (msg[]<>exit)
+	    {
+		echo(new line, "*** An error occurred during the installation process ***", new line);
+		echo("    Message: ", msg[] );
+		echo("    For help, add the option '--help' to the command to start the installation");
+		echo("    Installation procedure will be stopped", new line, new line);
+	    }
+	    else
+	    {
+	        echo(new line, "Exit - Installation program is exiting.");
+	    }
+	}
+
+	sleep(2);
+
+}
