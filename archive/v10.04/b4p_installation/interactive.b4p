@@ -1,0 +1,14 @@
+#!/usr/local/bin/b4p -x
+
+// The statement in the 1st row applies to UNIX/Linux/MacOS only and is called a "Shebang".
+// It specifies the language interpreter to use when started as an executable file.
+// You can delete this line it if you plan to use B4P under Windows only.
+
+// Linux/MacOS: The command line option -x in the Shebang statement instructs Beyond4P
+// to return directly to the shell or calling program without asking to
+// push [Enter].  This is suitable for embedding beyond4P code in batch scripts.
+
+// Shebangs are ignored in Microsoft Windows environments.
+
+
+interactive;

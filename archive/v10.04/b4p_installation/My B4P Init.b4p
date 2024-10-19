@@ -1,0 +1,34 @@
+
+/*
+	My B4P Init.b4p
+
+	This user-definable initialization file needs to be located in the directory
+	name as specified in 'system info[user app data directory b4p]'
+	in order to start it.  Otherwise this process will be skipped without notice.
+
+	This file will be called twice:
+
+	1st time:	Before the library files are called
+	2nd time:	After  the library files are called
+
+	ATTENTION:	Neither 'B4P Init.b4p' nor 'My B4P Init.b4p' will be executed
+			if B4P is started with the command line switch '-w'.
+*/
+
+
+once // Following code is executed at the 1st call before loading library files begins
+{
+
+//	echo("Starting to load the standard library files ...");
+	runtime settings[verbose] = quiet;
+
+}
+else // Following code is executed at the 2nd call after all library files have been loaded
+{
+
+//	echo("... Done.");
+	runtime settings[verbose] = low;
+
+}
+
+
