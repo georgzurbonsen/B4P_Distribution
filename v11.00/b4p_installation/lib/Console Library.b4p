@@ -735,7 +735,7 @@ define procedure and function( __ format print __, {{ attr, all, reference }, { 
 }
 
 
-define procedure and function( format print, {{ attributes, parameters }, { parameter 2, to string }}, 1, -1 )
+define procedure and function( format print, {{ attributes, set }, { parameter 2, to string }}, 1, -1 )
 {
 
     local
@@ -875,7 +875,7 @@ define procedure and function( format print, {{ attributes, parameters }, { para
 }
 
 
-define additional procedure and function( format, format print, {{ attributes, parameters }, { parameter 2, to string }}, 1, -1 );
+define additional procedure and function( format, format print, {{ attributes, set }, { parameter 2, to string }}, 1, -1 );
 
 
 

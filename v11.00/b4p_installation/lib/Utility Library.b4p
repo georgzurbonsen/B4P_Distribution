@@ -36,6 +36,7 @@
 	2.05	8.00a		2021-03-02	Added function 'get long options'.  
 						Hardened all functions against collisions with equally named global variables
 	3.00	10.00		2022-03-15	literal -> string
+	3.00	11.00		2024-08-15	Added functions 'print matrix' and 'compose matrix'
 
 */
 
@@ -66,7 +67,7 @@ once
 	//
 
 
-	define procedure and function( get long options, {{ valid option names, to parameters members to string}}, 0, 1 )
+	define procedure and function( get long options, {{ valid option names, to set members to string}}, 0, 1 )
 	{
 	    if (existing( long options[] )) if (identify( long options[] )=='array') delete members( long options[] ); // Delete members if array
 	    local
@@ -274,11 +275,123 @@ once
       }
     }
 
+
+//
+// Printing out matrices
+//
+
+
+define procedure and function( print matrix, { { number format, string }, { element length, numeral }, { separator, string }, { parameter 4, valid }}, 4, -1 )
+{
+    local
+    {
+	forget memorized table columns;
+
+        // Step 1: Identify the heights and widths of every matrix
+
+        last parameter[] = compose( 'parameter ', parameter count[] );
+
+        matrix[] = 0; // Base variable is counter
+
+        table create( __ matrix __ );
+        table configure( __ matrix __, read numerals, no );
+        col offset[] = 0;
+        max height[] = 0;
+
+        for all parameters( {parameter 4 .. last parameter[]}, para[], index[] )
+        {
+
+            if (type(para[][])==set)
+            {
+                matrix[matrix[],width ] = 0;
+                matrix[matrix[],height] = para[][]{};
+                with table( __ matrix __, 0 )
+                {
+                    [col offset[],0..] = { compose('Line',col offset[]++,':',matrix[]), matrix[matrix[],height]:separator[]};
+
+                    for all parameters( para[][], matrix row[], matrix row index[] )
+                    {
+                        if (type(matrix row[])!=set) // 1 vertical matrix
+                        {
+                            matrix[matrix[],width ] = max 123( matrix[matrix[],width ], 1 ); // 1 column
+                            s[] = select if ( is numeric(matrix row[]), str(matrix row[],number format[]), matrix row[] );
+			    s[] = pad right( str(s[]), element length[], ' ');
+			    [col offset[],matrix row index[]+1] = s[];
+                        }
+                        else
+                        {
+                            matrix[matrix[],width ] = max 123( matrix[matrix[],width ], matrix row[]{} ); // 0 or more columns
+                            for all parameters( matrix row[], cell[], x[] )
+                            {
+                                s[] = select if ( is numeric(cell[]), str(cell[],number format[]), cell[] );
+				s[] = pad right( str(s[]), element length[], ' ' );
+				if (x[] < matrix row[]{}-1) s[] += '  '; // Spacer between matrix
+				[col offset[]+x[],matrix row index[]+1] = s[];
+                            }
+                        }
+                    }
+                    for (i[] = col offset[], i[] < col offset[]+matrix[matrix[],width], i[]++) [i[]] = compose('Matrix',i[],":",matrix[]);
+                    col offset[] += matrix[matrix[],width];
+                    [col offset[],0..] = { compose('Line',col offset[]++,':',matrix[]), matrix[matrix[],height]:separator[]};
+                }
+                max height[] = max 123( max height[], matrix[matrix[],height] );
+                matrix[]++;
+            }
+            else
+            {
+                [__ matrix __:col offset[],0..] = { compose('Text ',col offset[]++),  para[][] };
+                max height[] = max 123( max height[], 1 );
+            }
+
+        }
+
+        // Move the matrices down
+
+        for all variables( matrix[], val[], i[] )
+        {
+            headers[] = filter( [__ matrix __:..,0], soft(compose('*:',i[])) );
+            indent[] = round up( (max height[] - matrix[i[],height])/2);
+	    table insert cells in columns( __ matrix __, headers[], 1, indent[] );
+        }
+
+	table delete blank rows(__ matrix __);
+        headers[] = [__ matrix __::'Text*',0];
+	table insert cells in columns( __ matrix __, headers[], 1, round down((table length(__ matrix __)-1)/2) );
+
+	table delete blank rows(__ matrix __);
+
+	// Ensure text and matrix line columns have same max width in every row
+
+	for all table columns( __ matrix __) 
+	{
+		a[] = max 123(vlength( [.,..] ));
+		[.,..] = pad right( [.,..], a[] );
+	}
+
+	output[] = {};
+	table process( __ matrix __, 
+		output[] += {join([..],'')};
+		if (function name[]!=compose matrix) echo( join([..],'') ) );
+
+	if (function name[]==echo matrix) echo;
+	return( output[]);
+
+    }
+}
+
+
+define additional function( compose matrix, print matrix, { { number format, string }, { element length, numeral }, { separator, string }, { parameter 4, valid }}, 4, -1 );
+define additional procedure and function( echo matrix, print matrix,    { { number format, string }, { element length, numeral }, { separator, string }, { parameter 4, valid }}, 4, -1 );
+
+
+
+
+
 //
 // Following functions are experimental and not yet formally documented.
 //
 //
-	define procedure( table load and keep, { { table name, string }, { file name,  string }, { columns to keep, parameters} } )
+	define procedure( table load and keep, { { table name, string }, { file name,  string }, { columns to keep, set} } )
 	{
 	    echo("Loading table ", table name[], " from file ", file name[] );
 
@@ -295,7 +408,7 @@ once
 	}
 
 
-	define additional procedure( table load csv and keep, table load and keep, { { table name, string }, { file name,  string }, { columns to keep, parameters} } );
+	define additional procedure( table load csv and keep, table load and keep, { { table name, string }, { file name,  string }, { columns to keep, set} } );
 
 
 

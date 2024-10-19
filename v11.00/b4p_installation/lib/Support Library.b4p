@@ -398,14 +398,14 @@ define procedure( __ internal table display row __, { { table, string }, { coord
 
 
 
-define procedure( __ tabulate variable __,  { { variable, all, reference }, { table, string }, { coords, all, reference }, { hierarchy, parameters }, { action, string } } )
+define procedure( __ tabulate variable __,  { { variable, all, reference }, { table, string }, { coords, all, reference }, { hierarchy, set }, { action, string } } )
 {
     local
     {
 	// Following entries in coords[] are used
 	//
 	//	coords[depth]			Initial visualization depth
-	//	coords[row variable]		Variable member name specified in a parameter set
+	//	coords[row variable]		Variable member name specified in a set
 	//	coords[row tabulated]		Working row in table to tabulate
 
 	//  Actions:
@@ -507,7 +507,7 @@ define procedure and function( table view,
 	{ { table, string }, 
 	  { prompt, string}, 
 	  { return characters, string}, 
-	  { options, parameters }, 
+	  { options, set }, 
 	  { row, all, output }, 
 	  { col, all, output }, 
 	  { callback function name, string }, 			// Optionally specify callback function
@@ -1079,7 +1079,7 @@ define additional procedure and function( variable view, table view,
 	{ { variable, all, reference }, 
 	  {prompt, string}, 
 	  { return characters, string}, 
-	  { options, parameters }, 
+	  { options, set }, 
 	  { row, all, output }, 
 	  { col, all, output },
 	  { callback function name, string }, 			// Optionally specify callback function
@@ -1461,8 +1461,8 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 	table load			( __ toc __, toc file[] );
 	table process			( __ toc __, all keywords[] += tokenize( [Keywords], {}, "," ); all features[] += tokenize( [Feature Names], {}, "," ) );
 
-	table process 			( __ toc __, [Keywords] = join( parameter set([Feature Names]) | parameter set([Keywords]), "," );
-						[Feature Names] = parameter set([Keywords]){} );
+	table process 			( __ toc __, [Keywords] = join( set([Feature Names]) | set([Keywords]), "," );
+						[Feature Names] = set([Keywords]){} );
 	table rename column headers	( __ toc __, Feature Names, Keyword Count );
 
 	table insert columns		( __ toc __, {Upper Section Nr, Upper Section Name}, {'',''}, Section Nr );
@@ -1470,7 +1470,7 @@ define procedure ( docs, {{ keyword, string } }, 0, 1 )
 	table lookup			( __ toc __, Upper Section Nr, Upper Section Name, __ toc __, Section Nr, Section Name );
 
 	table insert selected rows	( __ toc __, true /* all */, [Keyword Count]-1, { Section Nr, Section Name, Upper Section Nr, Upper Section Name, Keywords, HTML File Name }, Keyword Count );
-	table process			( __ toc __, [Keywords] = parameter set([Keywords]){[Keyword Count]} );
+	table process			( __ toc __, [Keywords] = set([Keywords]){[Keyword Count]} );
 	table delete columns		( __ toc __, Keyword Count );
 	table sort selected rows	( __ toc __, [Section Name] != 'Table of Contents', Keywords, alphabetic ignore case );
 	table keep columns		( __ toc __, { Section Nr, HTML File Name, Upper Section Name, Section Name, Keywords } );
@@ -1621,7 +1621,7 @@ define procedure and function( __ file browser callback function __ , {{ table n
 }
 
 
-define procedure and function ( file browser, { { prompt, string }, { path, string }, { pattern, string }, { options, parameters }}, 0, 4 )
+define procedure and function ( file browser, { { prompt, string }, { path, string }, { pattern, string }, { options, set }}, 0, 4 )
 {
     local
     {

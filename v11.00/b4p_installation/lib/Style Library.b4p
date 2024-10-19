@@ -87,19 +87,19 @@ once
 
 	// Function:	rgb
 	//
-	// Description:	Converts a color specification into a parameter set of 3 numerals
+	// Description:	Converts a color specification into a set of 3 numerals
 	//
 	// Parameters:	{ red, green, blue } or color name or  #RRGGBB
-	//		Returned as qualified { red, green, blue } parameter set
+	//		Returned as qualified { red, green, blue } set
 	//
 	// Return val:	Blank = OK, otherwise error message
 
 
-	define function( rgb, {{ color, string or parameters, reference }} )
+	define function( rgb, {{ color, string or set, reference }} )
 	{
-	    if (type(color[])==parameter set)
+	    if (type(color[])==set)
 	    {
-		if (color[]{} != 3) return( "Parameter set for a color must contain 3 elements {red, green, blue}.");
+		if (color[]{} != 3) return( "Set for a color must contain 3 elements {red, green, blue}.");
 
 		unless (is numeric(color[]{0})) return("1st color (red) is not a number.");
 		unless (is numeric(color[]{1})) return("2nd color (green) is not a number.");
@@ -123,19 +123,19 @@ once
 			return( compose("Specified color name '", color[],"' is unknown") );
 		}
 	    }
-	    else: return( "Variable provided to function 'rgb' is neither of type 'string' nor 'parameter set'");
+	    else: return( "Variable provided to function 'rgb' is neither of type 'string' nor 'set'");
 	    return('');
 	}
 
 
 
-	define function ( check and translate color, { { generic attribute value, string or parameters, reference }, { rgb out, boolean } }, 1, 2 )
+	define function ( check and translate color, { { generic attribute value, string or set, reference }, { rgb out, boolean } }, 1, 2 )
 	{
 	    if (!existing(rgb out[])) rgb out[] = false;
 
-	    if ( type(generic attribute value[]) == 'parameter set' )
+	    if ( type(generic attribute value[]) == 'set' )
 	    {
-		if (generic attribute value[]{} != 3) return( "Parameter set for a color must contain 3 elements {red, green, blue}.");
+		if (generic attribute value[]{} != 3) return( "Set for a color must contain 3 elements {red, green, blue}.");
 
 		unless (is numeric(generic attribute value[]{0})) return("First color (red) is not a number.");
 		unless (is numeric(generic attribute value[]{1})) return("Second color (green) is not a number.");
@@ -177,7 +177,7 @@ once
 			}
 		    }
 		}
-	    else : return( "Provided wrong type to specify a color: '", type(generic attribute value[]), "'. string or parameter set expected." );
+	    else : return( "Provided wrong type to specify a color: '", type(generic attribute value[]), "'. string or set expected." );
 	    return (""); // OK
 	}
 
@@ -442,7 +442,7 @@ once
 
 
 
-	define function ( lighten color, { { color in, string or parameters }, { factor, numeral } } )
+	define function ( lighten color, { { color in, string or set }, { factor, numeral } } )
 	{
 	    if (factor[] < 1) factor[] = 1;
 	    local() ret val[] = rgb( color in[] );
@@ -478,7 +478,7 @@ once
 	}
 
 
-	define function ( darken color, { { color in, string or parameters }, { factor, numeral } } )
+	define function ( darken color, { { color in, string or set }, { factor, numeral } } )
 	{
 	    if (factor[] < 1) factor[] = 1;
 	    local() ret val[] = rgb( color in[] );
@@ -510,7 +510,7 @@ once
 	}
 
 
-	define function ( weaken color, { { color in, string or parameters }, { factor, numeral } } )
+	define function ( weaken color, { { color in, string or set }, { factor, numeral } } )
 	{
 	    if (factor[] < 1) factor[] = 1;
 	    local() ret val[] = rgb( color in[] );
@@ -555,7 +555,7 @@ once
 	}
 
 
-	define procedure ( add color, { { color name, string }, { category 2, string }, { color in, string or parameters } } )
+	define procedure ( add color, { { color name, string }, { category 2, string }, { color in, string or set } } )
 	{
 	    local() 
 	    {
@@ -884,7 +884,7 @@ once
 	//			    
 	//
 	//	    'comment'  (HTML to Excel requires a dedicated comment management)
-	//		'Comment0000', 'Comment0001', ... -> { Row number, Column Number, Text } // Parameter Set
+	//		'Comment0000', 'Comment0001', ... -> { Row number, Column Number, Text } // Set
 	//		
 	//
         //	'XML'          
@@ -974,9 +974,9 @@ once
 		case (border spec)
 		{
 		    message[] = compose(parameter number[]+1, ". Parameter (Attribute Value) = '",generic attribute value[], "' is invalid. ", new line,
-				"A parameter set containing 2 elements {border thickness and color} is expected");
+				"A set containing 2 elements {border thickness and color} is expected");
 
-		    if (type(generic attribute value[]) != parameter set)	exception( stop, message[], 2);
+		    if (type(generic attribute value[]) != set)	exception( stop, message[], 2);
 		    if (generic attribute value[]{} != 2)			exception( stop, message[], 2);
 
 
@@ -2691,7 +2691,7 @@ define procedure ( table style theme, {{table name, string}, { theme name, strin
 		    {
 			(c[])[] = chosen theme 2[c[]];
 		    }
-		    if (c[][] = '{*}') (c[])[] = parameter set( c[][] );
+		    if (c[][] = '{*}') (c[])[] = set( c[][] );
 		}
 	}
 
@@ -2703,7 +2703,7 @@ define procedure ( table style theme, {{table name, string}, { theme name, strin
 	    {
 		pattern[] = chosen theme 2[pattern];
 	    }
-	    if (pattern[] = '{*}') pattern[] = parameter set( pattern[] );
+	    if (pattern[] = '{*}') pattern[] = set( pattern[] );
 	}
 
 
@@ -2774,7 +2774,7 @@ define procedure ( table style theme, {{table name, string}, { theme name, strin
 	    {
 		exception( stop, compose("Function 'table style theme':", new line, "attribute value = '", frame[], "' for attribute name = 'frame' is invalid (not beginning/ending with {..})"), 1);
 	    }
-	    frame[] = parameter set( frame[] );
+	    frame[] = set( frame[] );
 
 	    table process all rows( table name[], 
 		call( table style cells, { table name[], 0,             row(), single, left border,  frame[] } );

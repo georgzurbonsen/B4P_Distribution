@@ -53,6 +53,8 @@
 	4.01	10.00		2022-07-03	Bugfix: rows style IDs[] and columns style IDs[] were shared and not specific to multiple sheets. Converted to arrays, indexed by sheet number
 	4.02	10.04		2024-02-16	Bugfix: Now loading Excel files from Salesforce "Lightening" reliably
 	4.03	10.04		2024-07-10	Bugfix: Excel sometimes uses "H" instead of "h" to save date time info refering to format for hours.
+	4.04	10.04		2024-08-07	Bugfix: Styles not saved properly if only some Excel files contain style info (was confusion global / local variable)
+	4.05	10.04		2024-08-14	Bugfix: Redundant number formats read in from bottom outside 'numFmts' block.  Has been fixed.
 
 */
 
@@ -174,8 +176,8 @@ once
 
 
 	define procedure( office document properties, {{ office file name, string },
-							{ property names,  parameters, output },
-							{ property values, parameters, output }} )
+							{ property names,  set, output },
+							{ property values, set, output }} )
 	{
 	    local() temp verbose[] = runtime settings[verbose];
 	    runtime settings[verbose] = quiet;
@@ -306,7 +308,7 @@ once
 	//
 	// Parameters:	excel file name		Name of Exel file (e.g. .xlsx, .xslm)
 	//
-	// Return val:	parameter set		Contains list of available sheets
+	// Return val:	set			Contains list of available sheets
 
 
 	define function( excel list sheets, {{ excel file name, string }} )
@@ -553,8 +555,10 @@ once
 		// Step 4A: Put additional styles sheets into the '_office number formats' table
 
 			table copy table ( __ excel number formats __, _office number formats );
-			table process selected rows	( _office styles, [XML Tag]==numFmt,
+			table process selected rows	( _office styles, ([XML Tag]=numFmt,numFmts),
 				{
+					if ([XML Tag]==numFmts & [XML Usage]==End) break; // Prevents numFmt in lower part of styles file not used.
+					if ([XML Tag]==numFmts) continue;
 					numfmt[] 	= [(formatCode)]; // Do not remove parentheses.  It forces to look up for actual column location and not
 					numfmtid[]	= [(numFmtId)];   // use memorized column number in the previous call
 
@@ -587,7 +591,7 @@ once
 					{
 						[_office number formats:Variable Type,numfmtid[]] = numeral;
 					}
-					
+				
 
 				} );
 
@@ -960,7 +964,7 @@ once
 	// Return val:	-
 
 
-	define procedure ( table save excel file, { { table names, to parameters members to string }, { sheet names, to parameters members to string }, { excel file name, string }, { active sheet name, string } }, 3, 4 )
+	define procedure ( table save excel file, { { table names, to set members to string }, { sheet names, to set members to string }, { excel file name, string }, { active sheet name, string } }, 3, 4 )
 	{
 	    local
 	    {
@@ -979,7 +983,6 @@ once
 		active sheet number[] 			= 0; // counts from 0, i.e. 0 = sheet 1, 1 = sheet 2, etc.
 
 		runtime settings[verbose] = select if ( (temp verbose[]='quiet,low'), quiet, low );
-
 
 
 		// Step 1:  Checking all input parameters
@@ -1063,6 +1066,8 @@ once
 		for all parameters( table names[], table name[] )
 		{
 
+
+
 		    if (existing(table style descriptions[table name[]])) // Style attributes have been included
 		    {
 			if (temp verbose[] <> quiet,low)
@@ -1083,7 +1088,7 @@ once
 			    echo("               Table '", table name[], "': Style description not yet existing. Do the check");
 			}
 
-			table style descriptions[table name[]] = -1; // (Style Library.b4p sets to 0.)
+			global() table style descriptions[table name[]] = -1; // (Style Library.b4p sets to 0.)
 			my table[]  =^ table style descriptions[ table name[] ];
 
 			__ xl save precheck contents __ ( table name[], my table[] );
@@ -1187,16 +1192,17 @@ once
 			table initialize	( int table contents[], { { Coord, Type, Style, Value } } );
 			this table[] 		=^ table style descriptions[table name[]];
 
+
 			// --- Identifying all rows containing cell style info -- 
 			//
-			// A parameter set containing info about cell style instructions is set up.  The number of elements is either
+			// A set containing info about cell style instructions is set up.  The number of elements is either
 			// the number of rows with data or where a style has been applied (below the table), whichever is bigger.
 			// Example: { -1, -1, 0, 1, -1, -1, 2, -1 } denotes to 3 rows with cell style instructions.  Here it is the variable index.
 
 			last row[] = table length( table name[] ) - 1;
 			if (existing( this table[cell] ))
 			{
-				given row numbers[] 		= deep( num, {set names(this table[cell],1,all)} );
+				given row numbers[] 		= deep( num, {variable names(this table[cell],1,all)} );
 				if (given row numbers[]{} > 0)	last row[]= max 123( last row[], given row numbers[]{-1} );
 				rows with cell styles[]		= { last row[]+1 : -1 };
 				for all parameters 		( given row numbers[], r[], j[] ) rows with cell styles[]{r[]} = j[];
@@ -1206,7 +1212,7 @@ once
 
 			// --- Identifying all rows containing row style info -- 
 			//
-			// A parameter set containing info about row style instructions is set up.  The number of elements is either
+			// A set containing info about row style instructions is set up.  The number of elements is either
 			// the number of rows with data or where a style has been applied (below the table), whichever is bigger.
 			// Example: { -1, 1, -1, -1, 2, -1, 3, -1 } denotes to 3 rows with EXCEL style IDs
 			//
@@ -1214,7 +1220,7 @@ once
 
 			if (existing( this table[row] ))
 			{
-				given row numbers[] 		= deep( num, {set names(this table[row],1,all)} );
+				given row numbers[] 		= deep( num, {variable names(this table[row],1,all)} );
 				rows style IDs[i[]]		= { max 123( last row[], given row numbers[]{-1} )+1 : -1 };
 				for all parameters 		( given row numbers[], r[], j[] ) rows style IDs[i[]]{r[]} = __ define excel style attributes __ (  this table[row,j[]] );
 			}
@@ -1223,7 +1229,7 @@ once
 
 			// --- Identifying all columns containing column style info -- 
 			//
-			// A parameter set containing info about column style instructions is set up.  The number of elements is either
+			// A set containing info about column style instructions is set up.  The number of elements is either
 			// maximum table width PLUS 1 or where a style has been applied (below the table), whichever is bigger.
 			// Example: { -1, 1, -1, -1, 2, -1, 3, -1 } denotes to 3 columns with EXCEL style IDs
 			//
@@ -1231,7 +1237,7 @@ once
 
 			if (existing( this table[column] ))
 			{
-				given column numbers[] 		= deep( num, {set names(this table[column],1,all)} );
+				given column numbers[] 		= deep( num, {variable names(this table[column],1,all)} );
 				columns style IDs[i[]]		= { max 123( table max width(table name[]), given column numbers[]{-1} )+1 : -1 };
 				for all parameters 		( given column numbers[], c[], j[] ) columns style IDs[i[]]{c[]} = __ define excel style attributes __ (  this table[column,j[]] );
 			}
@@ -1265,7 +1271,7 @@ once
 			    if (rows with cell styles[]{row[]}>=0) // Row contains cell styles
 			    {
 				    this row[] 			=^ this table[cell,rows with cell styles[]{row[]}];
-				    given col numbers[] 	= deep( num, {set names(this row[],1,all)} );
+				    given col numbers[] 	= deep( num, {variable names(this row[],1,all)} );
 				    if (given col numbers[]{-1} > last col[]) 
 				    {
 //					echo("EXTENDING TABLE"); // interactive;
@@ -1748,7 +1754,7 @@ once
 			row[]      = -1;
 
 
-			array( ROWS STYLE IDs[], rows style IDs[i[]] ); // Make an array copy of this parameter set to avoid loading large values repeatedly.
+			array( ROWS STYLE IDs[], rows style IDs[i[]] ); // Make an array copy of this set to avoid loading large values repeatedly.
 
 
 

@@ -76,7 +76,7 @@ once
 		libraries[zip library,zip path] = "";
 		attribute read( system info[user app data directory b4p], "B4P User Settings.json", "7-Zip Path", libraries[zip library,zip path] );
 
-		if (type(libraries[zip library,zip path]) == parameter set)
+		if (type(libraries[zip library,zip path]) == set)
 		{
 			libraries[zip library,zip path] = pick if( libraries[zip library,zip path]{}==0, '', libraries[zip library,zip path]{0} );
 		}
@@ -119,7 +119,7 @@ once
 	        global { libraries[zip library,zip path] = ""; libraries[zip library,unzip path] = ""; }
 		attribute read( system info[user app data directory b4p], "B4P User Settings.json", "Zip Path", libraries[zip library,zip path] );
 
-		if (type(libraries[zip library,zip path]) == parameter set)
+		if (type(libraries[zip library,zip path]) == set)
 		{
 			libraries[zip library,zip path] = pick if( libraries[zip library,zip path]{}==0, '', libraries[zip library,zip path]{0} );
 		}
@@ -182,7 +182,7 @@ once
 
 
 
-	define procedure ( zip extract files, {{ archive file name, string }, { content file names, to parameters members to string}, { target directory name, string }}, 2, 3 )
+	define procedure ( zip extract files, {{ archive file name, string }, { content file names, to set members to string}, { target directory name, string }}, 2, 3 )
 	{
 		substitute all			( archive file name[], "/", system info[directory separator] );
 		substitute all			( archive file name[], "\", system info[directory separator] );
