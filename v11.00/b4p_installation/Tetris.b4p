@@ -1,4 +1,6 @@
 #!/usr/local/bin/b4p -x
+
+
 // Challenge: Code the TETRIS game in B4P with less than 100 statements
 
 sizes[width]	= 16;
