@@ -6,8 +6,7 @@
 5. Type './setup' to launch setup program
 
 
-#### Optional: 
-Install supporting Windows applications:  
+Optional: Install supporting Windows applications:  
 1. Terminal:  https://cmder.net/
 2. Visual Studio Code:  https://code.visualstudio.com/
 3. PDF reader: https://www.foxitsoftware.com/pdf-reader
