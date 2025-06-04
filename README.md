@@ -1,24 +1,13 @@
-## Beyond4P Distribution
+## B4P Download
 
 A language and engine for processing tabular data
 
 ### Installation
-1. Right-click on the installation file of choice (Win, Mac, Linux) and download
-2. Double-click the downloaded installation file; this will decompress as 'b4p_installation'
+1. Click on the  B4P installation file of choice (Win, Mac, Linux) and download
+2. Double-click the downloaded file; this will unzip as 'b4p_installation'
 3. In the terminal, change directory to 'b4p_installation'
 4. Type './setup' to launch setup program
 
-### Script
-```text
-cd $HOME
-# wget file as 'raw' to avoid conversion to HTML
-wget --no-check-certificate https://github.com/georgzurbonsen/Beyond4P_Distribution/raw/master/current/b4p_linux.tar.gz
-# xtract file
-tar -xf b4p_linux.tar.gz
-chmod -R 755 b4p_installation
-cd b4p_installation/
-sudo ./setup --choice=machine --locale=en_US
-```
 
 ### Windows Supporting Applications
 1. Terminal:  https://cmder.net/
