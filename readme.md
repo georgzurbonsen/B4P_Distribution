@@ -1,7 +1,12 @@
 ## Download and Install B4P
 
-1. Download the B4P installer from the above list for your computer (Win, Mac, Linux)
-2. In your 'Downloads Folder', double-click the downloaded zip file; this will unzip as 'b4p_installation'
+1. Download the B4P installer
+  - Click on the desired B4P installer above (Win, Mac, Linux)
+  - In the top right hand corner of Github web page, click on 'download raw file'
+  - This will download the file to the 'Downloads Folder' of your computer
+2. Unzip the downloaded file
+   - Open the Downloads Folder and double-click the zip file
+   - This will decompress the file as the folder 'b4p_installation'
 3. In the terminal, change directory to 'b4p_installation'
 4. Type './setup' to launch setup program
 
