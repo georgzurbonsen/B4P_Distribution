@@ -6,10 +6,10 @@
 5. Type './setup' to launch setup program
 
 
+
 Optional: Install supporting Windows applications:  
-1. Terminal:  https://cmder.net/
-2. Visual Studio Code:  https://code.visualstudio.com/
-3. PDF reader: https://www.foxitsoftware.com/pdf-reader
-4. LibreOffice: https://www.libreoffice.org
-5. Visual C++ Runtime (vc_redist.x64):  https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads
+1. Visual Studio Code:  https://code.visualstudio.com/
+2. PDF reader: https://www.foxitsoftware.com/pdf-reader
+3. LibreOffice: https://www.libreoffice.org
+4. Visual C++ Runtime (vc_redist.x64):  https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads
 
