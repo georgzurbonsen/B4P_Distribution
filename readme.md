@@ -1,4 +1,4 @@
-## Download and install B4P
+### Download and installation
 
 1. Download the desired B4P installer (Win, Mac, Linux) from the above list
 2. Unzip the downloaded file by double-clicking it. This will create the folder 'b4p_installation'
@@ -7,7 +7,7 @@
 
 
 
-Optional: Install supporting Windows applications:  
+##### Optional: Supporting Apps
 1. Visual Studio Code:  https://code.visualstudio.com/
 2. PDF reader: https://www.foxitsoftware.com/pdf-reader
 3. LibreOffice: https://www.libreoffice.org
