@@ -3,11 +3,10 @@
 A language and engine for processing tabular data
 
 ### Installation
-1. Click in 'current' folder
-2. Right-click on the installation file of choice (Win, Mac, Linux) and download
-3. Double-click the downloaded installation file; this will decompress as 'b4p_installation'
-4. In the terminal, change directory to 'b4p_installation'
-5. Type './setup' to launch setup program
+1. Right-click on the installation file of choice (Win, Mac, Linux) and download
+2. Double-click the downloaded installation file; this will decompress as 'b4p_installation'
+3. In the terminal, change directory to 'b4p_installation'
+4. Type './setup' to launch setup program
 
 ### Script
 ```text
